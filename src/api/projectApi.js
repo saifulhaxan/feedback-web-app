@@ -1,12 +1,9 @@
 import Fetcher from "../library/Fetcher";
 
 export const createProject = async (data) => {
-  // Handle both FormData and JSON data
   if (data instanceof FormData) {
-    // Current implementation - FormData with file upload
-  return Fetcher.post("user/projects", data);
+    return Fetcher.post("user/projects", data);
   } else {
-    // JSON structure as specified
     const payload = {
       name: data.name,
       problem: data.problem,
@@ -15,30 +12,25 @@ export const createProject = async (data) => {
       description: data.description,
       imageUrl: data.imageUrl,
       youtubeLink: data.youtubeLink,
-      status: data.status || "In Progress"
+      status: data.status || "In Progress",
     };
-    
     return Fetcher.post("user/projects", payload);
   }
 };
 
 export const stepProject = async (data) => {
-  // Handle both FormData and JSON data
   if (data instanceof FormData) {
-    // Current implementation - FormData with file upload
-  return Fetcher.post("user/stepConfig", data);
+    return Fetcher.post("user/stepConfig", data);
   } else {
-    // JSON structure as specified - use exact key names
     const payload = {
-      projectId: data.projectId, // Use projectId as specified
+      projectId: data.projectId,
       startTime: data.startTime,
       endTime: data.endTime,
       stepsPerHour: data.stepsPerHour,
       breakTime: data.breakTime,
       beepAudio: data.beepAudio,
-      popupText: data.popupText
+      popupText: data.popupText,
     };
-    
     return Fetcher.post("user/stepConfig", payload);
   }
 };
@@ -52,8 +44,6 @@ export const deleteProject = async (data) => {
 };
 
 export const editProject = async ({ id, formData }) => {
-  // console.log(id, formData, "This is project id and formData");
-
   return Fetcher.put(`user/projects/${id}`, formData);
 };
 
@@ -64,7 +54,6 @@ export const editProjectBasic = async ({ id, formData }) => {
 export const editProjectSettings = async ({ id, formData }) => {
   return Fetcher.put(`user/stepConfig/${id}`, formData);
 };
-
 
 // Get relationship types (for child management)
 export const getMyUser = async (data) => {
@@ -119,8 +108,22 @@ export const deleteStepConfig = async (configId) => {
   return Fetcher.delete(`user/stepConfig/${configId}`);
 };
 
+// Progress Detail / Controls
+export const getProjectProgressDetail = async (projectId) => {
+  return Fetcher.get(`user/projects/${projectId}/progress`);
+};
 
+export const resumeProjectProgress = async (projectId) => {
+  return Fetcher.post(`user/projects/${projectId}/resume`);
+};
 
+export const pauseProjectProgress = async (projectId) => {
+  return Fetcher.post(`user/projects/${projectId}/pause`);
+};
+
+export const updateProjectProgress = async (projectId, progress) => {
+  return Fetcher.post(`user/projects/${projectId}/progress`, { progress });
+};
 
 export default {
   createProject,
@@ -141,5 +144,9 @@ export default {
   assignProject,
   unassignProject,
   getStepConfigById,
-  deleteStepConfig
-};
+  deleteStepConfig,
+  getProjectProgressDetail,
+  resumeProjectProgress,
+  pauseProjectProgress,
+  updateProjectProgress,
+}

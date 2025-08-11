@@ -14,7 +14,7 @@ import Modal from "@mui/material/Modal";
 import Box from "@mui/material/Box";
 import CircularProgress from "@mui/material/CircularProgress";
 import axios from "axios";
-import { deleteProject } from "../api/projectApi";
+import { deleteProject, startProject } from "../api/projectApi";
 import { useMutation } from "@tanstack/react-query";
 import { toast } from "react-toastify";
 import SearchProjectShareModal from "./projectModal/SearchProjectShareModal";
@@ -56,6 +56,23 @@ const ProjectCard = ({ projectData, index, onEdit, onDeleted, userData, sharedWi
 
   const handleShareModalClose = () => {
     setShareModalOpen(false);
+  };
+
+  const handleStart = async () => {
+    const id = projectData?.project?.id || projectData?.id;
+    const alreadyStarted = projectData?.project?.isStarted ?? projectData?.isStarted;
+    try {
+      setLoading(true);
+      if (!alreadyStarted) {
+        await startProject(id);
+        toast.success("Project started successfully");
+      }
+      navigate(`/solution-function?projectId=${id}`);
+    } catch (e) {
+      toast.error(e?.response?.data?.message || "Failed to start project");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleShareSuccess = () => {
@@ -360,7 +377,8 @@ const ProjectCard = ({ projectData, index, onEdit, onDeleted, userData, sharedWi
                 </div>
                 <Button
                   variant="primary"
-                  onClick={() => navigate("/solution-function")}
+                  onClick={handleStart}
+                  disabled={loading}
                 >
                   Start
                 </Button>
