@@ -16,6 +16,7 @@ import User4 from "../assets/images/user4.png";
 import User5 from "../assets/images/user5.png";
 import User6 from "../assets/images/user6.png";
 import { FaCheck } from "react-icons/fa";
+import { FaLock, FaGlobe } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import GroupModal from "../components/groupModal/GroupModal";
 import Fetcher from "../library/Fetcher";
@@ -40,15 +41,27 @@ const style = {
 export default function GroupPage() {
   const [gridView, setGridView] = useState(true);
   const [listView, setListView] = useState(false);
-  const [activeTab, setActiveTab] = useState("All");
+  const [activeTab, setActiveTab] = useState("My Groups");
+  const [activeSubTab, setActiveSubTab] = useState("Joined");
   const [open, setOpen] = React.useState(false);
   const handleOpen = () => setOpen(true);
   const handleClose = () => setOpen(false);
+  
+  // Callback to refresh groups data after successful creation
+  const handleGroupCreated = () => {
+    fetchGroups();
+    fetchPendingGroups();
+  };
   const [allGroupsArr, setGroupData] = useState();
 
   const label = { inputProps: { "aria-label": "Switch demo" } };
 
-  const navigate = useNavigate();
+// Helper function to get group initials
+const getGroupInitials = (groupName = "") => {
+  return groupName.charAt(0).toUpperCase();
+};
+
+const navigate = useNavigate();
 
   // const allGroupsArrs = [
   //   {
@@ -122,7 +135,7 @@ export default function GroupPage() {
     joinPublicGroup(groupId)
       .then((res) => {
         toast.success(res?.data?.data?.message || "Join request sent");
-        fetchGroups()
+        fetchGroups(activeTab === "My Groups" ? "normal" : "monitoring")
         fetchPendingGroups()
         // Optionally refresh groups or update UI
       })
@@ -136,9 +149,9 @@ export default function GroupPage() {
 
 
 
-  const fetchGroups = () => {
+  const fetchGroups = (type = "normal") => {
     // setIsRequestsLoading(true);
-    getAllGroups("normal")
+    getAllGroups(type)
       .then((res) => {
         console.log(res, "requests");
         setGroupData(res?.data?.data);
@@ -196,7 +209,7 @@ export default function GroupPage() {
       const response = await respondToGroupInvitation(groupInfo);
       console.log("✅ API Success:", response.data);
       toast.success(response?.data?.data?.message || "Request Updated");
-      fetchGroups()
+      fetchGroups(activeTab === "My Groups" ? "normal" : "monitoring")
       fetchPendingGroups()
 
 
@@ -207,9 +220,19 @@ export default function GroupPage() {
 
 
   useEffect(() => {
-    fetchGroups()
+    fetchGroups("normal")
     fetchPendingGroups()
   }, [])
+
+  // Refresh data when active tab changes
+  useEffect(() => {
+    if (activeTab === "My Groups") {
+      fetchGroups("normal")
+      fetchPendingGroups()
+    } else if (activeTab === "Monitor Groups") {
+      fetchGroups("monitoring")
+    }
+  }, [activeTab])
 
 
   const changeToGrid = () => {
@@ -224,6 +247,10 @@ export default function GroupPage() {
 
   const handleSwitchTabs = (e) => {
     setActiveTab(e.target.name);
+  };
+
+  const handleSwitchSubTabs = (e) => {
+    setActiveSubTab(e.target.name);
   };
 
   const handleSteps = () => {
@@ -268,7 +295,7 @@ export default function GroupPage() {
 
           <div className="connection-btns-line d-flex align-items-center justify-content-between mt-4 mb-4">
             <div className="connection-btn-wrap d-flex">
-              {["All", "My Groups", "Monitor Groups"].map((tab) => (
+              {["My Groups", "Monitor Groups"].map((tab) => (
                 <Button
                   key={tab}
                   sx={{
@@ -281,7 +308,7 @@ export default function GroupPage() {
                   name={tab}
                   onClick={handleSwitchTabs}
                 >
-                  {tab === "All" ? "All" : tab.charAt(0).toUpperCase() + tab.slice(1)}
+                  {tab}
                 </Button>
               ))}
             </div>
@@ -343,138 +370,189 @@ export default function GroupPage() {
           </div>
         </div>
 
-        {activeTab == "All" && (
+
+
+                {activeTab == "My Groups" && (
           <>
-            {
-              pendingGroup?.some((card) => card.status === "PENDING") && (
-                <>
-                  <h3>Group Invites</h3>
-                  <div className={`${gridView ? "group-container" : "group-container-grid"}`}>
-                    {pendingGroup && pendingGroup?.map((card, index) => (
-                      <div key={index} className={`group-card-wrapper pt-4 pb-4 mb-3 ${gridView ? "text-center" : "mb-3"}`}>
-                        <div className={`group-card ${gridView ? "" : "d-flex align-items-center justify-content-between px-4"}`}>
-                          <div className={`image-wrapper ${gridView ? "" : "d-flex align-items-center"}`}>
-                            <div className={`image-wrap  ${gridView ? "mb-2" : "me-3"}`}>
-                              <img src={`https://feedbackwork.net/feedbackapi/${card?.group?.imageUrl}`} alt="" className="rounded-circle"
-                                style={{ width: 60, height: 60, objectFit: "cover", margin: "0 auto" }} />
-                            </div>
-                            <div className="group-description-wrap">
-                              <h6 className="mb-1">{card?.group?.name}</h6>
-                              <p className={`${gridView ? "mb-0" : "mb-0"}`}>{card?.group?.description}</p>
-                              <p>Total Members: {card?.members?.length}</p>
-                            </div>
+            {/* Sub-tabs for My Groups */}
+            <div className="connection-btn-wrap d-flex mb-3">
+              {["Joined", "Pending"].map((subTab) => (
+                <Button
+                  key={subTab}
+                  sx={{
+                    textTransform: "none",
+                    bgcolor: activeSubTab === subTab ? "#EBF5FF" : "white",
+                    color: activeSubTab === subTab ? "#0064D1" : "black",
+                    fontWeight: "bold",
+                  }}
+                  className="me-2"
+                  name={subTab}
+                  onClick={handleSwitchSubTabs}
+                >
+                  {subTab}
+                </Button>
+              ))}
+            </div>
+
+            {/* Pending Groups Section */}
+            {activeSubTab === "Pending" && (
+              <>
+                <div className={`${gridView ? "group-container" : "group-container-grid"}`}>
+                  {pendingGroup && pendingGroup?.map((card, index) => (
+                    <div key={index} className={`group-card-wrapper pt-4 pb-4 mb-3 ${gridView ? "text-center" : "mb-3"}`}>
+                      <div className={`group-card ${gridView ? "text-center" : "d-flex align-items-center justify-content-between px-4"}`}>
+                        <div className={`image-wrapper ${gridView ? "text-center" : "d-flex align-items-center"}`}>
+                          <div className={`image-wrap ${gridView ? "mb-2" : "me-3"}`}>
+                            {card?.group?.imageUrl ? (
+                              <img 
+                                src={`https://feedbackwork.net/feedbackapi/${card.group.imageUrl}`} 
+                                alt="" 
+                                className="rounded-circle"
+                                style={{ width: 60, height: 60, objectFit: "cover", margin: "0 auto" }}
+                                onError={(e) => {
+                                  e.target.style.display = 'none';
+                                  e.target.nextSibling.style.display = 'flex';
+                                }}
+                              />
+                            ) : (
+                              <div 
+                                className="rounded-circle d-flex align-items-center justify-content-center text-white fw-bold"
+                                style={{ 
+                                  width: 60, 
+                                  height: 60, 
+                                  backgroundColor: '#007bff',
+                                  margin: "0 auto"
+                                }}
+                              >
+                                {getGroupInitials(card?.group?.name)}
+                              </div>
+                            )}
                           </div>
-                          <div className="group-card-btn">
-                            <button className={`btn mx-1 ${card?.status == "PENDING" ? "connection-connect-as" : "btn-primary"}`} onClick={() => { handleAccept(card?.group?.id, 'accept') }}>Join Group</button>
-                            <button className={`btn mx-1 ${card?.status == "PENDING" ? "connection-connect-as" : "btn-primary"}`} onClick={() => { handleReject(card?.group?.id, 'reject') }}>Decline</button>
+                          <div className={`group-description-wrap ${gridView ? "text-center" : ""}`}>
+                            <h6 className="mb-1">{card?.group?.name}</h6>
+                            <p className={`${gridView ? "mb-0" : "mb-0"}`}>{card?.group?.description}</p>
+                            <p>Total Members: {card?.members?.length}</p>
                           </div>
                         </div>
-                      </div>
-                    ))}
-                  </div>
-                </>
-              )
-            }
-
-
-            <h3>All Groups</h3>
-            <div className={`${gridView ? "group-container" : "group-container-grid"}`}>
-              {allGroupsArr && allGroupsArr?.normal?.map((card, index) => (
-                <div key={index} className={`group-card-wrapper pt-4 pb-4 mb-3 ${gridView ? "text-center" : "mb-3"}`}>
-                  <div className={`group-card ${gridView ? "" : "d-flex align-items-center justify-content-between px-4"}`}>
-                    <div className={`image-wrapper ${gridView ? "" : "d-flex align-items-center"}`}>
-                      <div className={`image-wrap  ${gridView ? "mb-2" : "me-3"}`}>
-                        <img src={`https://feedbackwork.net/feedbackapi/${card?.imageUrl}`} alt="" className="rounded-circle"
-                          style={{ width: 60, height: 60, objectFit: "cover", margin: "0 auto" }} />
-                      </div>
-                      <div className="group-description-wrap">
-                        <h6 className="mb-1">{card.name}</h6>
-                        <p className={`${gridView ? "mb-0" : "mb-0"}`}>{card.description}</p>
-                        <p>Total Members: {card?.members?.length}</p>
+                        <div className={`group-card-btn ${gridView ? "mt-3" : ""}`}>
+                          <button className={`btn mx-1 ${card?.status == "PENDING" ? "connection-connect-as" : "btn-primary"}`} onClick={() => { handleAccept(card?.group?.id, 'accept') }}>Join Group</button>
+                          <button className={`btn mx-1 ${card?.status == "PENDING" ? "connection-connect-as" : "btn-primary"}`} onClick={() => { handleReject(card?.group?.id, 'reject') }}>Decline</button>
+                        </div>
                       </div>
                     </div>
-                    <div className="group-card-btn">
-                      <button className={`btn ${card.status == "Joined" ? "connection-connect-as" : "btn-primary"}`}>Joined</button>
-                      <button 
-                        className="btn btn-outline-secondary ms-2" 
-                        onClick={() => navigate(`/groups/${card.id}`)}
-                        title="Group Settings"
-                      >
-                        <MdSettings />
-                      </button>
-                    </div>
-                  </div>
+                  ))}
                 </div>
-              ))}
-            </div>
-            <div className={`${gridView ? "group-container" : "group-container-grid"}`}>
-              {allGroupsArr && allGroupsArr?.monitoring?.map((card, index) => (
-                <div key={index} className={`group-card-wrapper pt-4 pb-4 mb-3 ${gridView ? "text-center" : "mb-3"}`}>
-                  <div className={`group-card ${gridView ? "" : "d-flex align-items-center justify-content-between px-4"}`}>
-                    <div className={`image-wrapper ${gridView ? "" : "d-flex align-items-center"}`}>
-                      <div className={`image-wrap  ${gridView ? "mb-2" : "me-3"}`}>
-                        <img src={`https://feedbackwork.net/feedbackapi/${card?.imageUrl}`} alt="" className="rounded-circle"
-                          style={{ width: 60, height: 60, objectFit: "cover", margin: "0 auto" }} />
-                      </div>
-                      <div className="group-description-wrap">
-                        <h6 className="mb-1">{card.name}</h6>
-                        <p className={`${gridView ? "mb-0" : "mb-0"}`}>{card.description}</p>
-                        <p>Total Members: {card?.members?.length}</p>
-                      </div>
-                    </div>
-                    <div className="group-card-btn">
-                      <button className={`btn ${card.status == "Joined" ? "connection-connect-as" : "btn-primary"}`}>Joined</button>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </>
-        )}
+              </>
+            )}
 
-        {activeTab == "My Groups" && (
-          <div className={`${gridView ? "group-container" : "group-container-grid"}`}>
-            {allGroupsArr && allGroupsArr?.normal?.map((card, index) => (
-              <div key={index} className={`group-card-wrapper pt-4 pb-4 mb-3 ${gridView ? "text-center" : "mb-3"}`}>
-                <div className={`group-card ${gridView ? "" : "d-flex align-items-center justify-content-between px-4"}`}>
-                  <div className={`image-wrapper ${gridView ? "" : "d-flex align-items-center"}`}>
-                    <div className={`image-wrap  ${gridView ? "mb-2" : "me-3"}`}>
-                      <img src={`https://feedbackwork.net/feedbackapi/${card?.imageUrl}`} alt="" className="rounded-circle"
-                        style={{ width: 60, height: 60, objectFit: "cover", margin: "0 auto" }} />
-                    </div>
-                    <div className="group-description-wrap">
-                      <h6 className="mb-1">{card.name}</h6>
-                      <p className={`${gridView ? "mb-0" : "mb-0"}`}>{card.description}</p>
-                      <p>Total Members: {card?.members?.length}</p>
+            {/* Joined Groups Section */}
+            {activeSubTab === "Joined" && (
+              <>
+                <div className={`${gridView ? "group-container" : "group-container-grid"}`}>
+                  {allGroupsArr && allGroupsArr?.normal?.map((card, index) => (
+                  <div key={index} className={`group-card-wrapper pt-4 pb-4 mb-3 ${gridView ? "text-center" : "mb-3"}`}>
+                    <div className={`group-card ${gridView ? "text-center" : "d-flex align-items-center justify-content-between px-4"}`}>
+                      <div className={`image-wrapper ${gridView ? "text-center" : "d-flex align-items-center"}`}>
+                        <div className={`image-wrap ${gridView ? "mb-2" : "me-3"}`}>
+                          {card?.imageUrl ? (
+                            <img 
+                              src={`https://feedbackwork.net/feedbackapi/${card.imageUrl}`} 
+                              alt="" 
+                              className="rounded-circle"
+                              style={{ width: 60, height: 60, objectFit: "cover", margin: "0 auto" }}
+                              onError={(e) => {
+                                e.target.style.display = 'none';
+                                e.target.nextSibling.style.display = 'flex';
+                              }}
+                            />
+                          ) : (
+                            <div 
+                              className="rounded-circle d-flex align-items-center justify-content-center text-white fw-bold"
+                              style={{ 
+                                width: 60, 
+                                height: 60, 
+                                backgroundColor: '#007bff',
+                                margin: "0 auto"
+                              }}
+                            >
+                              {getGroupInitials(card.name)}
+                            </div>
+                          )}
+                        </div>
+                        <div className={`group-description-wrap ${gridView ? "text-center" : ""}`}>
+                          <div className={`d-flex align-items-center mb-1 ${gridView ? "justify-content-center" : ""}`}>
+                            <h6 className="mb-0 me-2">{card.name}</h6>
+                            {card.isPrivate ? (
+                              <FaLock className="text-muted" size={14} />
+                            ) : (
+                              <FaGlobe className="text-muted" size={14} />
+                            )}
+                          </div>
+                          <p className={`${gridView ? "mb-0" : "mb-0"}`}>{card.description}</p>
+                          <p>Total Members: {card?.members?.length}</p>
+                        </div>
+                      </div>
+                      <div className={`group-card-btn ${gridView ? "mt-3" : ""}`}>
+                        <button className="btn btn-link text-primary" onClick={() => navigate(`/groups/${card.id}`)}>
+                          Manage
+                        </button>
+                      </div>
                     </div>
                   </div>
-                  <div className="group-card-btn">
-                    <button className={`btn ${card.status == "Joined" ? "connection-connect-as" : "btn-primary"}`}>Joined</button>
-                  </div>
-                </div>
+                ))}
               </div>
-            ))}
-          </div>
+              </>
+            )}
+          </>
         )}
 
         {activeTab == "Monitor Groups" && (
           <div className={`${gridView ? "group-container" : "group-container-grid"}`}>
             {allGroupsArr?.monitoring?.map((card, index) => (
               <div key={index} className={`group-card-wrapper pt-4 pb-4 mb-3 ${gridView ? "text-center" : "mb-3"}`}>
-                <div className={`group-card ${gridView ? "" : "d-flex align-items-center justify-content-between px-4"}`}>
-                  <div className={`image-wrapper ${gridView ? "" : "d-flex align-items-center"}`}>
-                    <div className={`image-wrap  ${gridView ? "mb-2" : "me-3"}`}>
-                      <img src={`https://feedbackwork.net/feedbackapi/${card?.group?.imageUrl}`} alt="" className="rounded-circle"
-                        style={{ width: 60, height: 60, objectFit: "cover", margin: "0 auto" }} />
+                <div className={`group-card ${gridView ? "text-center" : "d-flex align-items-center justify-content-between px-4"}`}>
+                  <div className={`image-wrapper ${gridView ? "text-center" : "d-flex align-items-center"}`}>
+                    <div className={`image-wrap ${gridView ? "mb-2" : "me-3"}`}>
+                      {card?.imageUrl ? (
+                        <img 
+                          src={`https://feedbackwork.net/feedbackapi/${card.imageUrl}`} 
+                          alt="" 
+                          className="rounded-circle"
+                          style={{ width: 60, height: 60, objectFit: "cover", margin: "0 auto" }}
+                          onError={(e) => {
+                            e.target.style.display = 'none';
+                            e.target.nextSibling.style.display = 'flex';
+                          }}
+                        />
+                      ) : (
+                        <div 
+                          className="rounded-circle d-flex align-items-center justify-content-center text-white fw-bold"
+                          style={{ 
+                            width: 60, 
+                            height: 60, 
+                            backgroundColor: '#007bff',
+                            margin: "0 auto"
+                          }}
+                        >
+                          {getGroupInitials(card.name)}
+                        </div>
+                      )}
                     </div>
-                    <div className="group-description-wrap">
-                      <h6 className="mb-1">{card.groupName}</h6>
+                    <div className={`group-description-wrap ${gridView ? "text-center" : ""}`}>
+                      <h6 className="mb-1">{card.name}</h6>
                       <p className={`${gridView ? "" : "mb-0"}`}>{card.descripton}</p>
                     </div>
                   </div>
-                  <div className="group-card-btn">
+                  <div className={`group-card-btn ${gridView ? "mt-3" : ""}`}>
                     <button className="btn btn-primary" onClick={() => navigate("/solution-function")}>
                       Monitor Group
+                    </button>
+                    <button 
+                      className="btn btn-link text-primary" 
+                      onClick={() => navigate(`/monitoring-groups/${card.id}`)}
+                      title="View Group Details"
+                    >
+                      View Details
                     </button>
                   </div>
                 </div>
@@ -484,7 +562,7 @@ export default function GroupPage() {
         )}
       </div>
 
-      <GroupModal open={open} onClose={handleClose} />
+      <GroupModal open={open} onClose={handleClose} onGroupCreated={handleGroupCreated} />
     </section>
   );
 }

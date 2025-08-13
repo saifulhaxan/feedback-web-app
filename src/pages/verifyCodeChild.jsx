@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import AuthImage from "../assets/images/auth-img.png";
 import VerifyCode from "../components/auth/VerifyCode";
 import { checkOtp, sendOtp, verifyOtp } from "../api/authApi";
+import { sendChildOtp } from "../api/childApi";
 import { useMutation } from "@tanstack/react-query";
 import { CircularProgress } from "@mui/material";
 import { toast } from "react-toastify";
@@ -54,6 +55,55 @@ function VerifyCodeChild() {
         otp: '', 
         childId: childId
     })
+
+    // Resend OTP functionality
+    const [canResend, setCanResend] = useState(false);
+    const [resendLoading, setResendLoading] = useState(false);
+
+    const handleResendOtp = async () => {
+        if (!canResend || resendLoading) return;
+        
+        setResendLoading(true);
+        try {
+            await sendChildOtp({ childId, email });
+            toast.success("OTP sent successfully!");
+            setTimer(60);
+            setIsTimerRunning(true);
+            setCanResend(false);
+        } catch (error) {
+            toast.error(error?.response?.data?.message || "Failed to send OTP");
+        } finally {
+            setResendLoading(false);
+        }
+    };
+
+    // Initialize timer on component mount
+    useEffect(() => {
+        if (childId && email) {
+            setTimer(60);
+            setIsTimerRunning(true);
+        }
+    }, [childId, email]);
+
+    // Timer effect for resend functionality
+    useEffect(() => {
+        let interval = null;
+        if (isTimerRunning && timer > 0) {
+            interval = setInterval(() => {
+                setTimer((prevTimer) => {
+                    if (prevTimer <= 1) {
+                        setIsTimerRunning(false);
+                        setCanResend(true);
+                        return 0;
+                    }
+                    return prevTimer - 1;
+                });
+            }, 1000);
+        }
+        return () => {
+            if (interval) clearInterval(interval);
+        };
+    }, [isTimerRunning, timer]);
 
 
     const handleVerifiedData = async () => {
@@ -179,6 +229,31 @@ function VerifyCodeChild() {
                 )} */}
                                 Confirm Code
                             </button>
+
+                            {/* Resend OTP Section */}
+                            <div className="text-center mt-3">
+                                {isTimerRunning ? (
+                                    <p className="text-muted">
+                                        Resend code in {timer} seconds
+                                    </p>
+                                ) : (
+                                    <button
+                                        type="button"
+                                        className="btn btn-link text-primary"
+                                        onClick={handleResendOtp}
+                                        disabled={resendLoading}
+                                    >
+                                        {resendLoading ? (
+                                            <>
+                                                <CircularProgress size={16} style={{ color: "#007bff", marginRight: "8px" }} />
+                                                Sending...
+                                            </>
+                                        ) : (
+                                            "Resend Code"
+                                        )}
+                                    </button>
+                                )}
+                            </div>
 
                         </div>
                     </div>

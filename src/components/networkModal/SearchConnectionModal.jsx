@@ -37,6 +37,25 @@ const SearchConnectionModal = ({ open, onClose, onApiResponse }) => {
   const { userData } = useUserStore();
   const { tokens } = useTokenStore();
 
+  // Reset state when modal opens/closes
+  useEffect(() => {
+    if (!open) {
+      // Reset all local state when modal closes
+      setQuery("");
+      setResults([]);
+      setOpenDropdown(null);
+      setSelectedRoles({});
+      setRequestedUsers([]);
+      setLoadingUser(null);
+      
+      // Clear any pending debounce timeout
+      if (debounceTimeout) {
+        clearTimeout(debounceTimeout);
+        setDebounceTimeout(null);
+      }
+    }
+  }, [open, debounceTimeout]);
+
   // Fetch roles once
   useEffect(() => {
     getConnectionOptions()
@@ -74,35 +93,6 @@ const SearchConnectionModal = ({ open, onClose, onApiResponse }) => {
   const handleConnectClick = (userId) => {
     setOpenDropdown((prev) => (prev === userId ? null : userId));
   };
-
-  // const handleSelectRole = (user, role) => {
-  //   setSelectedRoles((prev) => ({
-  //     ...prev,
-  //     [user.id]: role.id,
-  //   }));
-
-  //   setLoadingUser(user.id);
-
-  //   const payload = {
-  //     requesterId: userData?.user?.id,
-  //     receiverId: user.id,
-  //     connectAs: role.name,
-  //   };
-
-  //   Fetcher.post("/user/network/connections/request", payload)
-  //     .then(() => {
-  //       setRequestedUsers((prev) => [...prev, user.id]);
-  //       setLoadingUser(null);
-  //       setOpenDropdown(null);
-  //       toast.success("Request send successfully");
-  //     })
-  //     .catch((error) => {
-  //       console.error("Connection request failed:", error);
-  //       toast.error("Failed to send connection request");
-  //       setLoadingUser(null);
-  //       setOpenDropdown(null);
-  //     });
-  // };
 
   const handleSendConnectionRequest = (user) => {
     const roleId = selectedRoles[user.id];
@@ -157,12 +147,29 @@ const SearchConnectionModal = ({ open, onClose, onApiResponse }) => {
     console.log("🔍 Debug - Final payload being sent:", payload);
 
     sendConnectionRequest(payload)
-      .then(() => {
+      .then((response) => {
         setRequestedUsers((prev) => [...prev, user.id]);
         setLoadingUser(null);
         setOpenDropdown(null);
-        onApiResponse(true)
+        
+        // Call the parent's onApiResponse to trigger data refresh
+        if (onApiResponse) {
+          onApiResponse(response);
+        }
+        
         toast.success("Request sent successfully");
+        
+        // Refresh the search results to show updated status
+        if (query.trim()) {
+          searchUsers(query)
+            .then((res) => {
+              console.log("Refreshed search results:", res);
+              setResults(res?.data?.data?.users || []);
+            })
+            .catch((err) => {
+              console.error("Failed to refresh search results:", err);
+            });
+        }
       })
       .catch((error) => {
         console.error("Connection request failed:", error);
@@ -170,6 +177,37 @@ const SearchConnectionModal = ({ open, onClose, onApiResponse }) => {
         setLoadingUser(null);
         setOpenDropdown(null);
       });
+  };
+
+  // Helper function to get connection status
+  const getConnectionStatus = (user) => {
+    // Check if user has any connection status from server
+    if (user.connectionStatus) {
+      return user.connectionStatus.toUpperCase();
+    }
+    
+    // Check if user has pending received connections
+    if (user.receivedConnections?.some((conn) => conn.status === "PENDING")) {
+      return "PENDING";
+    }
+    
+    // Check if user has sent connections
+    if (user.sentConnections?.some((conn) => conn.status === "SENT")) {
+      return "SENT";
+    }
+    
+    // Check if user has connected status
+    if (user.receivedConnections?.some((conn) => conn.status === "CONNECTED") || 
+        user.sentConnections?.some((conn) => conn.status === "CONNECTED")) {
+      return "CONNECTED";
+    }
+    
+    // Check local state for recently requested users
+    if (requestedUsers.includes(user.id)) {
+      return "SENT";
+    }
+    
+    return "NONE";
   };
 
   return (
@@ -187,12 +225,9 @@ const SearchConnectionModal = ({ open, onClose, onApiResponse }) => {
             <ul className="list-unstyled">
               {results.map((user) => {
                 const initials = `${user.firstname?.charAt(0) || ""}${user.lastname?.charAt(0) || ""}`.toUpperCase();
-                const isRequested = requestedUsers.includes(user.id);
+                const connectionStatus = getConnectionStatus(user);
                 const isLoading = loadingUser === user.id;
                 const selectedRoleId = selectedRoles[user.id];
-                const hasPendingReceived = user.receivedConnections?.some((conn) => conn.status === "PENDING");
-                console.log('aa', hasPendingReceived)
-                // const hasConnected = user.receivedConnections?.some((conn) => conn.status == "connected");
 
                 return (
                   <li key={user.id} className="position-relative d-flex align-items-center justify-content-between border-bottom py-3">
@@ -220,71 +255,70 @@ const SearchConnectionModal = ({ open, onClose, onApiResponse }) => {
                       </div>
                     </div>
 
-                    {
-                      user?.connectionStatus != 'connected' && user?.connectionStatus != 'sent' ? (
-                        <div className="text-end">
-                          <button
-                            className="btn btn-sm btn-outline-primary"
-                            onClick={() => handleConnectClick(user.id)}
-                            disabled={isRequested || hasPendingReceived}
-                          >
-                            {isLoading ? <CircularProgress size={18} /> : isRequested ? "Requested" : hasPendingReceived ? "Pending" : "Connect As"}
-                          </button>
-
-                          {openDropdown === user.id && !isRequested && (
-                            <ClickAwayListener onClickAway={() => setOpenDropdown(null)}>
-                              <div
-                                className="shadow bg-white rounded"
-                                style={{
-                                  position: "absolute",
-                                  top: "100%",
-                                  right: 0,
-                                  zIndex: 10,
-                                  marginTop: "0.5rem",
-                                  width: "220px",
-                                  border: "1px solid #ddd",
-                                  overflow: "hidden",
-                                }}
-                              >
-                                {/* Connect Button */}
-                                {selectedRoleId && (
-                                  <div className="px-3 py-2">
-                                    <button className="btn btn-sm btn-primary w-100" onClick={() => handleSendConnectionRequest(user)}>
-                                      {loadingUser === user.id ? <CircularProgress size={18} /> : "Connect"}
-                                    </button>
-                                  </div>
-                                )}
-                                
-                                {roles.map((role) => (
-                                  <div
-                                    key={role.id}
-                                    className="px-3 py-2 border-bottom d-flex align-items-center"
-                                    style={{ cursor: "pointer" }}
-                                    onClick={() => setSelectedRoles((prev) => ({ ...prev, [user.id]: role.id }))}
-                                  >
-                                    <span className="me-2" style={{ width: "16px" }}>
-                                      {selectedRoleId === role.id && "✔️"}
-                                    </span>
-                                    <span>{role.name}</span>
-                                  </div>
-                                ))}
-
-
-                              </div>
-                            </ClickAwayListener>
-                          )}
-                        </div>
-                      ) : (
-
+                    {connectionStatus === 'CONNECTED' ? (
+                      <button className="btn btn-sm btn-outline-primary" disabled>
+                        Connected
+                      </button>
+                    ) : connectionStatus === 'SENT' ? (
+                      <button className="btn btn-sm btn-outline-primary" disabled>
+                        Sent
+                      </button>
+                    ) : connectionStatus === 'PENDING' ? (
+                      <button className="btn btn-sm btn-outline-primary" disabled>
+                        Pending
+                      </button>
+                    ) : (
+                      <div className="text-end">
                         <button
-                          className={`btn btn-sm ${user?.connectionStatus === '' ? 'btn-primary' : 'btn-outline-primary'}`}
+                          className="btn btn-sm btn-outline-primary"
+                          onClick={() => handleConnectClick(user.id)}
+                          disabled={isLoading}
                         >
-                          {user?.connectionStatus === 'connected' ? 'Connected' : 'Sent'}
+                          {isLoading ? <CircularProgress size={18} /> : "Connect As"}
                         </button>
-                      )
-                    }
 
-
+                        {openDropdown === user.id && (
+                          <ClickAwayListener onClickAway={() => setOpenDropdown(null)}>
+                            <div
+                              className="shadow bg-white rounded"
+                              style={{
+                                position: "absolute",
+                                top: "100%",
+                                right: 0,
+                                zIndex: 10,
+                                marginTop: "0.5rem",
+                                width: "220px",
+                                border: "1px solid #ddd",
+                                overflow: "hidden",
+                              }}
+                            >
+                              {/* Connect Button */}
+                              {selectedRoleId && (
+                                <div className="px-3 py-2">
+                                  <button className="btn btn-sm btn-primary w-100" onClick={() => handleSendConnectionRequest(user)}>
+                                    {loadingUser === user.id ? <CircularProgress size={18} /> : "Connect"}
+                                  </button>
+                                </div>
+                              )}
+                              
+                              {roles.map((role) => (
+                                <div
+                                  key={role.id}
+                                  className="px-3 py-2 border-bottom d-flex align-items-center"
+                                  style={{ cursor: "pointer" }}
+                                  onClick={() => setSelectedRoles((prev) => ({ ...prev, [user.id]: role.id }))}
+                                >
+                                  <span className="me-2" style={{ width: "16px" }}>
+                                    {selectedRoleId === role.id && "✔️"}
+                                  </span>
+                                  <span>{role.name}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </ClickAwayListener>
+                        )}
+                      </div>
+                    )}
                   </li>
                 );
               })}

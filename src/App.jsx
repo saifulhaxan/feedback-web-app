@@ -17,12 +17,13 @@ import FeedbackReceivedDetailModelPage from "./pages/FeedbackReceivedDetailModel
 import FeedbackReceivedDetailPage from "./pages/FeedbackReceivedDetailPage";
 import GroupPage from "./pages/GroupPage";
 import GroupDetailPage from "./pages/GroupDetailPage";
+import MonitoringGroupDetailPage from "./pages/MonitoringGroupDetailPage";
 import EditProfilePage from "./pages/EditProfilePage";
 import MyProfilePage from "./pages/MyProfilePage";
 import ManageRelationPage from "./pages/ManageRelationPage";
 import AddParentPage from "./pages/AddParentPage";
 import EditParentPage from "./pages/EditParentPage";
-import EditChildPage from "./pages/EditChildPage";
+
 import PaymentPage from "./pages/PaymentPage";
 import SolutionFunctionPage from "./pages/SolutionFunctionPage";
 import { ToastContainer } from "react-toastify";
@@ -101,9 +102,10 @@ function App() {
         <Route path="/manage-relation" element={<ManageRelationPage />} />
         <Route path="/groups" element={<GroupPage />} />
         <Route path="/groups/:groupId" element={<GroupDetailPage />} />
+        <Route path="/monitoring-groups/:groupId" element={<MonitoringGroupDetailPage />} />
         <Route path="/add-parent" element={<AddParentPage />} />
         <Route path="/edit-parent/:parentId" element={<EditParentPage />} />
-        <Route path="/edit-child/:childId" element={<EditChildPage />} />
+
         <Route path="/payment" element={<PaymentPage />} />
         <Route path="/solution-function" element={<SolutionFunctionPage />} />
       </Routes>

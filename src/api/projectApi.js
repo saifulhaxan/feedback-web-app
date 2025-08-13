@@ -122,7 +122,7 @@ export const pauseProjectProgress = async (projectId) => {
 };
 
 export const updateProjectProgress = async (projectId, progress) => {
-  return Fetcher.post(`user/projects/${projectId}/progress`, { progress });
+  return Fetcher.put(`user/projects/${projectId}/progress`, { progress });
 };
 
 export default {

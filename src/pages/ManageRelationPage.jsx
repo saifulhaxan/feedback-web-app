@@ -12,6 +12,7 @@ import Parent1 from "../assets/images/parent1.png";
 import { 
   getAllChildren, 
   createChild, 
+  editChild,
   sendChildOtp, 
   verifyChildEmail,
   getAllSecondaryParents,
@@ -42,9 +43,13 @@ export default function ManageRelationPage() {
   const [activeTab, setActiveTab] = useState("Parents");
   const [activeRequestTab, setActiveRequestTab] = useState("Received");
   const [open, setOpen] = useState(false);
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [editingChild, setEditingChild] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
+  const [editImagePreview, setEditImagePreview] = useState(null);
   const [isExpanded, setIsExpanded] = useState(false);
   const [formErrors, setFormErrors] = useState({});
+  const [editFormErrors, setEditFormErrors] = useState({});
 
   const setUser = useUserStore((state) => state.setUser);
 
@@ -66,6 +71,7 @@ export default function ManageRelationPage() {
   };
 
   const [formData, setFormData] = useState(initialFormData);
+  const [editFormData, setEditFormData] = useState(initialFormData);
 
   const [otpData, setOtpData] = useState({
     childId: '',
@@ -73,6 +79,28 @@ export default function ManageRelationPage() {
   })
 
   const handleOpen = () => setOpen(true);
+  const handleEditOpen = (child) => {
+    setEditingChild(child);
+    setEditFormData({
+      firstname: child.firstname || "",
+      lastname: child.lastname || "",
+      email: child.email || "",
+      password: "",
+      confirmPassword: "",
+      ageRange: child.ageRange || "",
+      grade: child.grade || "",
+      image: child.image || "",
+    });
+    setEditImagePreview(child.image ? `https://feedbackwork.net/feedbackapi/${child.image.replace(/^\/+/, "")}` : null);
+    setEditModalOpen(true);
+  };
+  const handleEditClose = () => {
+    setEditModalOpen(false);
+    setEditingChild(null);
+    setEditFormData(initialFormData);
+    setEditImagePreview(null);
+    setEditFormErrors({});
+  };
 
   const [myChildrenArr, setChildArr] = useState();
   const [myParentArr, setParentArr] = useState([]);
@@ -179,6 +207,18 @@ export default function ManageRelationPage() {
     fetchRequests(true);  // Fetch sent requests
   }, [])
 
+  // Refresh data when active tab changes
+  useEffect(() => {
+    if (activeTab === "Parents") {
+      fetchParents();
+    } else if (activeTab === "Children") {
+      fetchChild();
+    } else if (activeTab === "Requests") {
+      fetchRequests(false); // Fetch received requests
+      fetchRequests(true);  // Fetch sent requests
+    }
+  }, [activeTab])
+
   const handleClose = () => {
     setFormData(initialFormData);
     setImagePreview(null);
@@ -212,6 +252,11 @@ export default function ManageRelationPage() {
     console.log('data', formData)
   };
 
+  const handleEditChange = (e) => {
+    const { id, value } = e.target;
+    setEditFormData((prev) => ({ ...prev, [id]: value }));
+  };
+
   const toggleFilter = (value) => {
     setFormData((prev) => ({
       ...prev,
@@ -234,6 +279,18 @@ export default function ManageRelationPage() {
     reader.onloadend = () => {
       setImagePreview(reader.result);
       setFormData((prev) => ({ ...prev, image: reader.result }));
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleEditImageUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setEditImagePreview(reader.result);
+      setEditFormData((prev) => ({ ...prev, image: reader.result }));
     };
     reader.readAsDataURL(file);
   };
@@ -282,7 +339,7 @@ export default function ManageRelationPage() {
     if (!formData.confirmPassword) errors.confirmPassword = "Please re-enter password";
     if (formData.password !== formData.confirmPassword)
       errors.confirmPassword = "Passwords do not match";
-    if (!formData.image) errors.image = "Image is required";
+    // Image is optional - removed validation
 
     setFormErrors(errors);
 
@@ -326,6 +383,64 @@ export default function ManageRelationPage() {
     }
   };
 
+  const handleEditSubmit = async () => {
+    const errors = {};
+
+    // if (!editFormData.firstame.trim()) errors.firstname = "First name is required";
+    // if (!editFormData.lastname.trim()) errors.lastname = "Last name is required";
+
+    if (!editFormData.ageRange) errors.ageRange = "Age range is required";
+    if (!editFormData.grade) errors.grade = "Grade is required";
+
+    setEditFormErrors(errors);
+
+    if (Object.keys(errors).length === 0) {
+      console.log("✅ Validated Edit Form Data", editFormData);
+      console.log("🔧 Editing Child ID:", editingChild.id);
+
+      // Remove image, confirmPassword, and email before sending
+      const { image, confirmPassword, email, ...cleanedData } = editFormData;
+      console.log("📤 Sending cleaned data to API:", cleanedData);
+
+      try {
+        console.log("🚀 Making PUT request to edit child...");
+        const resp = await editChild(editingChild.id, cleanedData);
+        console.log("✅ Edit API Response:", resp);
+        
+        const payload = resp?.data;
+        console.log("📋 Response payload:", payload);
+
+        if (!payload?.status) {
+          console.error("❌ API returned false status:", payload);
+          toast.error(payload?.message || "Failed to update child");
+          return;
+        }
+
+        toast.success(payload?.data?.data?.message || "Child updated successfully!");
+        handleEditClose();
+        fetchChild(); // Refresh the children list
+      } catch (error) {
+        console.error("❌ Edit child API error:", error);
+        console.error("❌ Error response:", error?.response);
+        console.error("❌ Error message:", error?.message);
+        
+        if (error?.response?.status === 401) {
+          toast.error("Authentication failed. Please login again.");
+        } else if (error?.response?.status === 403) {
+          toast.error("You don't have permission to perform this action.");
+        } else if (error?.response?.status === 404) {
+          toast.error("Child not found. Please refresh the page.");
+        } else if (error?.response?.data?.message) {
+          toast.error(error.response.data.message);
+        } else if (error?.message) {
+          toast.error(`Request failed: ${error.message}`);
+        } else {
+          toast.error("Failed to update child. Please try again.");
+        }
+      }
+    }
+  };
+
 
 
 
@@ -336,7 +451,7 @@ export default function ManageRelationPage() {
 
   const [innerTab, setInnerTab] = useState("MY");
 
-
+console.log('myChildrenArr', myParentArr)
 
 
   return (
@@ -390,27 +505,27 @@ export default function ManageRelationPage() {
                 <div className="group-card">
                   <div className="image-wrapper">
                     <div className="image-wrap mb-2">
-                      {card.parent?.image ? (
+                      {card?.image ? (
                         <img
-                          src={`https://feedbackwork.net/feedbackapi/${card.parent.image.replace(/^\/+/, "")}`}
-                          alt={`${card.parent?.firstname || ''} ${card.parent?.lastname || ''}`.trim()}
+                          src={`https://feedbackwork.net/feedbackapi/${card.image.replace(/^\/+/, "")}`}
+                          alt={`${card?.firstname || ''} ${card?.lastname || ''}`.trim()}
                         />
                       ) : (
                         <div className="avatar-circle">
-                          <span className="avatar-text">{(card.parent?.firstname?.charAt(0) || 'U').toUpperCase()}</span>
+                          <span className="avatar-text">{(card.parent?.firstName?.charAt(0) || 'U').toUpperCase()}</span>
                         </div>
                       )}
                     </div>
                     <div className="group-description-wrap">
-                      <h6 className="mb-1 fw-bold">{`${card.parent?.firstname || ''} ${card.parent?.lastname || ''}`.trim()}</h6>
-                      <p className="mb-0 fw-500">{card.customRelationship || card.relationshipType?.name || 'Parent'}</p>
+                      <h6 className="mb-1 fw-bold">{`${card?.firstname || ''} ${card?.lastname || ''}`.trim()}</h6>
+                      <p className="mb-0 fw-500">{card.email}</p>
                       {card.sameResidence && (
                         <p className="mb-0 small text-success">Same residence</p>
                       )}
                       <div className="mt-2">
                         <button
                           className="btn btn-sm btn-outline-danger"
-                          onClick={() => handleRemoveParent(card.parent?.id)}
+                          onClick={() => handleRemoveParent(card?.id)}
                         >
                           Remove
                         </button>
@@ -462,35 +577,39 @@ export default function ManageRelationPage() {
                           {card.image ? (
                             <img 
                               src={`https://feedbackwork.net/feedbackapi/${card.image.replace(/^\/+/, "")}`}
-                              alt={card.firstName + ' ' + card.lastName} 
+                              alt={card.firstname + ' ' + card.lastname} 
                             />
                           ) : (
                             <div className="avatar-circle">
                               <span className="avatar-text">
-                                {(card.firstName?.charAt(0) || 'U').toUpperCase()}
+                                {(card.firstname?.charAt(0) || 'U').toUpperCase()}
                               </span>
                             </div>
                           )}
                         </div>
                         <div className="group-description-wrap">
-                          <h6 className="mb-1 fw-bold">{card.firstName + ' ' + card.lastName}</h6>
+                          <h6 className="mb-1 fw-bold">{card.firstname + ' ' + card.lastname}</h6>
                           <p className="mb-0 fw-500">Grade: {card.grade}</p>
                           <p className="mb-0 fw-500">Age: {card.ageRange}</p>
-                          {!card.isVerified && (
-                            <div className="mt-2">
+                          <div className="mt-2 d-flex gap-2 justify-content-center align-items-center">
+                            {!card.isVerified && (
                               <button
                                 className="btn btn-sm btn-success"
                                 onClick={() => handleSendChildVerification(card.id, card.email)}
                               >
                                 Send Verification
                               </button>
-                            </div>
-                          )}
-                          {card.isVerified && (
-                            <div className="mt-2">
+                            )}
+                            {card.isVerified && (
                               <span className="badge bg-success">Verified</span>
-                            </div>
-                          )}
+                            )}
+                            <button
+                              className="btn btn-sm btn-primary"
+                              onClick={() => handleEditOpen(card)}
+                            >
+                              Edit
+                            </button>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -525,7 +644,7 @@ export default function ManageRelationPage() {
                       </div>
                       
                       {/* Children under this parent */}
-                      <div className="children-section ps-3">
+                      <div className="children-section p-3">
                         <h6 className="mb-2 text-muted">Childrens:</h6>
                         {parentGroup.children?.map(child => (
                           <div key={child.id} className="child-item mb-2 p-2 border rounded">
@@ -534,7 +653,7 @@ export default function ManageRelationPage() {
                                 {child.image ? (
                                   <img 
                                     src={`https://feedbackwork.net/feedbackapi/${child.image.replace(/^\/+/, "")}`}
-                                    alt={child.firstName + ' ' + child.lastName}
+                                    alt={child.firstname + ' ' + child.lastname}
                                     style={{ width: '40px', height: '40px', borderRadius: '50%', objectFit: 'cover' }}
                                   />
                                 ) : (
@@ -550,12 +669,12 @@ export default function ManageRelationPage() {
                                     fontSize: '14px',
                                     fontWeight: 'bold'
                                   }}>
-                                    {(child.firstName?.charAt(0) || 'U').toUpperCase()}
+                                    {(child.firstname?.charAt(0) || 'U').toUpperCase()}
                                   </div>
                                 )}
                               </div>
                               <div className="flex-grow-1">
-                                <h6 className="mb-0 fw-bold">{child.firstName + ' ' + child.lastName}</h6>
+                                <h6 className="mb-0 fw-bold">{child.firstname + ' ' + child.lastname}</h6>
                                 <p className="mb-0 small text-muted">Grade: {child.grade} | Age: {child.ageRange}</p>
                               </div>
                             </div>
@@ -607,19 +726,19 @@ export default function ManageRelationPage() {
                             {request.requester?.image ? (
                               <img 
                                 src={`https://feedbackwork.net/feedbackapi/${request.requester.image.replace(/^\/+/, "")}`}
-                                alt={request.requester.firstname + ' ' + request.requester.lastname} 
+                                alt={request.requester.firstName + ' ' + request.requester.lastname} 
                               />
                             ) : (
                               <div className="avatar-circle">
                                 <span className="avatar-text">
-                                  {(request.requester?.firstname?.charAt(0) || 'U').toUpperCase()}
+                                  {(request.requester?.firstName?.charAt(0) || 'U').toUpperCase()}
                                 </span>
                               </div>
                             )}
                           </div>
                           <div className="group-description-wrap">
                             <h6 className="mb-1 fw-bold">
-                              {request.requester?.firstname + ' ' + request.requester?.lastname}
+                              {request.requester?.firstName + ' ' + request.requester?.lastname}
                             </h6>
                             <p className="mb-0 fw-500">Parent Request</p>
                             <p className="mb-2 text-muted small">
@@ -659,19 +778,19 @@ export default function ManageRelationPage() {
                             {request.receiver?.image ? (
                               <img 
                                 src={`https://feedbackwork.net/feedbackapi/${request.receiver.image.replace(/^\/+/, "")}`}
-                                alt={request.receiver.firstname + ' ' + request.receiver.lastname} 
+                                alt={request.receiver.firstName + ' ' + request.receiver.lastname} 
                               />
                             ) : (
                               <div className="avatar-circle">
                                 <span className="avatar-text">
-                                  {(request.receiver?.firstname?.charAt(0) || 'U').toUpperCase()}
+                                  {(request.receiver?.firstName?.charAt(0) || 'U').toUpperCase()}
                                 </span>
                               </div>
                             )}
                           </div>
                           <div className="group-description-wrap">
                             <h6 className="mb-1 fw-bold">
-                              {request.receiver?.firstname + ' ' + request.receiver?.lastname}
+                              {request.receiver?.firstName + ' ' + request.receiver?.lastname}
                             </h6>
                             <p className="mb-0 fw-500">Request Sent</p>
                             <p className="mb-2 text-muted small">
@@ -836,6 +955,124 @@ export default function ManageRelationPage() {
           <div className="d-flex justify-content-between mt-5 mb-5">
             <Button onClick={handleClose}>Cancel</Button>
             <Button onClick={handleSubmit}>Save</Button>
+          </div>
+        </Box>
+      </Modal>
+
+      {/* Edit Child Modal */}
+      <Modal open={editModalOpen} onClose={handleEditClose}>
+        <Box sx={style}>
+          <h3 className="mb-4">Edit Child</h3>
+
+          <div className="form-group mb-4 text-center">
+            <label htmlFor="edit-image-upload" className="cursor-pointer">
+              <Badge
+                overlap="circular"
+                anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+                badgeContent={<MdModeEdit className="profile-edit" />}
+              >
+                <Avatar src={editImagePreview} sx={{ width: 90, height: 90 }} />
+              </Badge>
+            </label>
+            <input type="file" id="edit-image-upload" accept="image/*" onChange={handleEditImageUpload} style={{ display: "none" }} />
+          </div>
+
+          <div className="row">
+            <div className="col-lg-6">
+              <div className="form-group mb-3">
+                <label className="auth-label">First Name</label>
+                <div className="authInputWrap d-flex align-items-center">
+                  <input
+                    id="firstName"
+                    type="text"
+                    className="form-control auth-input"
+                    placeholder="First name"
+                    value={editFormData.firstname}
+                    onChange={handleEditChange}
+                  />
+                </div>
+                {editFormErrors.firstName && <small className="text-danger">{editFormErrors.firstName}</small>}
+              </div>
+
+              <div className="form-group mb-3">
+                <label className="auth-label">Age Range</label>
+                <ul className="list-unstyled add-child-list">
+                  {filterCategories.map((item) => (
+                    <li
+                      key={item}
+                      className={`filter-item d-flex justify-content-between align-items-center p-2 rounded cursor-pointer fw-bold ${editFormData.ageRange === item ? "text-primary" : ""
+                        }`}
+                      onClick={() => setEditFormData(prev => ({ ...prev, ageRange: prev.ageRange === item ? "" : item }))}
+                    >
+                      <span>{item}</span>
+                      {editFormData.ageRange === item && <FaCheck className="text-primary" />}
+                    </li>
+                  ))}
+                </ul>
+                {editFormErrors.ageRange && <small className="text-danger">{editFormErrors.ageRange}</small>}
+              </div>
+
+              <div className="form-group mb-3">
+                <label className="auth-label">Email (Read-only)</label>
+                <div className="authInputWrap d-flex align-items-center">
+                  <input
+                    id="email"
+                    type="email"
+                    className="form-control auth-input"
+                    placeholder="Enter email"
+                    value={editFormData.email}
+                    readOnly
+                    style={{ backgroundColor: '#f8f9fa', cursor: 'not-allowed' }}
+                  />
+                </div>
+                <small className="text-muted">Email cannot be changed</small>
+              </div>
+            </div>
+
+            <div className="col-lg-6">
+              <div className="form-group mb-3">
+                <label className="auth-label">Last Name</label>
+                <div className="authInputWrap d-flex align-items-center">
+                  <input
+                    id="lastname"
+                    type="text"
+                    className="form-control auth-input"
+                    placeholder="Last name"
+                    value={editFormData.lastname}
+                    onChange={handleEditChange}
+                  />
+                </div>
+                {editFormErrors.lastname && <small className="text-danger">{editFormErrors.lastname}</small>}
+              </div>
+
+              <div className="form-group mb-3">
+                <div className="d-flex justify-content-between align-items-center">
+                  <label className="auth-label">Grade</label>
+                  <label className="text-primary mb-0 cursor-pointer" onClick={() => setIsExpanded(!isExpanded)}>
+                    {isExpanded ? "View Less Grades" : "View More Grades"} <MdOutlineExpandMore />
+                  </label>
+                </div>
+                <ul className="list-unstyled add-child-list">
+                  {gradeCategory.slice(0, isExpanded ? gradeCategory.length : 3).map((item) => (
+                    <li
+                      key={item}
+                      className={`filter-item d-flex justify-content-between align-items-center p-2 rounded cursor-pointer fw-bold ${editFormData.grade === item ? "text-primary" : ""
+                        }`}
+                      onClick={() => setEditFormData(prev => ({ ...prev, grade: prev.grade === item ? "" : item }))}
+                    >
+                      <span>{item}</span>
+                      {editFormData.grade === item && <FaCheck className="text-primary" />}
+                    </li>
+                  ))}
+                </ul>
+                {editFormErrors.grade && <small className="text-danger">{editFormErrors.grade}</small>}
+              </div>
+            </div>
+          </div>
+
+          <div className="d-flex justify-content-between mt-5 mb-5">
+            <Button onClick={handleEditClose}>Cancel</Button>
+            <Button onClick={handleEditSubmit}>Update Child</Button>
           </div>
         </Box>
       </Modal>

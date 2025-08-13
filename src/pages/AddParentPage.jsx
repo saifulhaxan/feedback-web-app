@@ -61,15 +61,77 @@ export default function AddParentPage() {
   };
 
   const handleNext = () => {
+    // Validate current step before proceeding
+    if (!isStepValid(activeStep)) {
+      return;
+    }
+
     let newSkipped = skipped;
     if (isStepSkipped(activeStep)) {
       newSkipped = new Set(newSkipped.values());
       newSkipped.delete(activeStep);
-      alert("finish");
     }
 
     setActiveStep((prevActiveStep) => prevActiveStep + 1);
     setSkipped(newSkipped);
+  };
+
+  // Function to validate if current step is complete
+  const isStepValid = (step) => {
+    switch (step) {
+      case 0: // Select Parent
+        return userFilters && userFilters.length > 0;
+      case 1: // Relationship with Children
+        if (!selectedFilters || selectedFilters.length === 0) {
+          return false;
+        }
+        // If "OTHER" is selected, check if custom relationship is provided
+        const selectedRelationshipType = filterUserList?.relationshipTypes?.find(item => 
+          item.id === (Array.isArray(selectedFilters) ? selectedFilters[0] : selectedFilters)
+        );
+        if (selectedRelationshipType?.name === "OTHER" && !customRelationship.trim()) {
+          return false;
+        }
+        return true;
+      case 2: // Select Residence
+        return selectedResidence !== undefined && selectedResidence !== null;
+      default:
+        return true;
+    }
+  };
+
+  // Function to get validation message for current step
+  const getValidationMessage = (step) => {
+    switch (step) {
+      case 0:
+        return "Please select a parent to continue";
+      case 1:
+        if (!selectedFilters || selectedFilters.length === 0) {
+          return "Please select a relationship type to continue";
+        }
+        const selectedRelationshipType = filterUserList?.relationshipTypes?.find(item => 
+          item.id === (Array.isArray(selectedFilters) ? selectedFilters[0] : selectedFilters)
+        );
+        if (selectedRelationshipType?.name === "OTHER" && !customRelationship.trim()) {
+          return "Please specify the custom relationship type to continue";
+        }
+        return "";
+      case 2:
+        return "Please select a residence option to continue";
+      default:
+        return "";
+    }
+  };
+
+  // Function to get step status for visual feedback
+  const getStepStatus = (step) => {
+    if (step < activeStep) {
+      return "completed";
+    } else if (step === activeStep) {
+      return isStepValid(step) ? "valid" : "invalid";
+    } else {
+      return "pending";
+    }
   };
 
   const handleBack = () => {
@@ -163,7 +225,8 @@ export default function AddParentPage() {
       } else if (error?.response?.status === 403) {
         toast.error("You don't have permission to perform this action.");
       } else if (error?.response?.status === 404) {
-        toast.error("API endpoint not found. Please contact support.");
+        // Check if user has children first
+        toast.error("You need to create at least one child before adding a secondary parent. Please create a child first.");
       } else if (error?.response?.data?.message) {
         toast.error(error.response.data.message);
       } else if (error?.message) {
@@ -233,6 +296,27 @@ export default function AddParentPage() {
   React.useEffect(() => {
     fetchRequests()
   }, [])
+
+  // Check if user has children before allowing to add parent
+  React.useEffect(() => {
+    const checkUserChildren = async () => {
+      try {
+        const response = await getAllChildren();
+        const children = response?.data?.data;
+        
+        if (!children?.primaryChildren || children.primaryChildren.length === 0) {
+          toast.error("You need to create at least one child before adding a secondary parent. Please go to the Children tab and create a child first.");
+          navigate("/manage-relation");
+        }
+      } catch (error) {
+        console.error("Failed to check user children:", error);
+        toast.error("Failed to verify if you have children. Please try again.");
+        navigate("/manage-relation");
+      }
+    };
+
+    checkUserChildren();
+  }, [navigate]);
 
   // Debug function to test API connectivity
   const testApiConnection = async () => {
@@ -318,6 +402,10 @@ export default function AddParentPage() {
                   if (isStepSkipped(index)) {
                     stepProps.completed = false;
                   }
+                  // Mark step as completed if it's behind the current step and was valid
+                  if (index < activeStep) {
+                    stepProps.completed = true;
+                  }
                   return (
                     <Step key={label} {...stepProps}>
                       <StepLabel {...labelProps}>{label}</StepLabel>
@@ -335,6 +423,14 @@ export default function AddParentPage() {
                   {/* Step 1 Content */}
                   {activeStep === 0 && (
                     <div className="row mt-5">
+                      <div className="col-12 mb-3">
+                        <div className={`alert ${isStepValid(0) ? 'alert-success' : 'alert-warning'} d-flex align-items-center`}>
+                          <span className="me-2">
+                            {isStepValid(0) ? '✓' : '⚠'}
+                          </span>
+                          {isStepValid(0) ? 'Step 1 Complete: Parent selected' : 'Step 1 Required: Please select a parent'}
+                        </div>
+                      </div>
                       <div className="connection-btns-line d-flex align-items-center justify-content-between mt-4 mb-3">
                         <div className="connection-btn-wrap d-flex"></div>
 
@@ -380,6 +476,14 @@ export default function AddParentPage() {
                   {/* Step 2 Content */}
                   {activeStep === 1 && (
                     <div className="row mt-5">
+                      <div className="col-12 mb-3">
+                        <div className={`alert ${isStepValid(1) ? 'alert-success' : 'alert-warning'} d-flex align-items-center`}>
+                          <span className="me-2">
+                            {isStepValid(1) ? '✓' : '⚠'}
+                          </span>
+                          {isStepValid(1) ? 'Step 2 Complete: Relationship type selected' : 'Step 2 Required: Please select a relationship type'}
+                        </div>
+                      </div>
                       <div className="col-lg-12">
                         <ul className="list-unstyled">
                           {[...filterUserList?.relationshipTypes]
@@ -429,6 +533,14 @@ export default function AddParentPage() {
                   {/* Step 3 Content */}
                   {activeStep === 2 && (
                     <div className="row mt-5">
+                      <div className="col-12 mb-3">
+                        <div className={`alert ${isStepValid(2) ? 'alert-success' : 'alert-warning'} d-flex align-items-center`}>
+                          <span className="me-2">
+                            {isStepValid(2) ? '✓' : '⚠'}
+                          </span>
+                          {isStepValid(2) ? 'Step 3 Complete: Residence option selected' : 'Step 3 Required: Please select a residence option'}
+                        </div>
+                      </div>
                       <div className="col-lg-12">
                         <ul className="list-unstyled">
                           {residenceArr.map(({ options, id }) => (
@@ -488,7 +600,21 @@ export default function AddParentPage() {
                           )}
                         </Button>
                       ) : (
-                        <Button onClick={handleNext}>Next</Button>
+                        <div>
+                          <Button 
+                            onClick={handleNext}
+                            disabled={!isStepValid(activeStep)}
+                            variant="contained"
+                            color="primary"
+                          >
+                            Next
+                          </Button>
+                          {!isStepValid(activeStep) && (
+                            <div className="text-danger mt-2 small">
+                              {getValidationMessage(activeStep)}
+                            </div>
+                          )}
+                        </div>
                       )}
                     </div>
                   </div>
