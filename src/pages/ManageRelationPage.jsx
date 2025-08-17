@@ -23,6 +23,7 @@ import {
 } from "../api/childApi";
 import { toast } from "react-toastify";
 import useUserStore from "../store/userStore";
+import { ROLES } from "../utils/rolePermissions";
 
 
 const style = {
@@ -43,12 +44,20 @@ export default function ManageRelationPage() {
   // Get current user data and role for role-based restrictions
   const { userData } = useUserStore();
   const currentUserRole = userData?.user?.role?.name;
-  const isParent = currentUserRole === "PARENT";
+  const isParent = currentUserRole === ROLES.PARENT;
+  const isChild = currentUserRole === ROLES.CHILD;
   
   // Debug logging for role-based restrictions
-  console.log('Manage Relation Page - User Role:', currentUserRole, 'Is Parent:', isParent);
+  console.log('Manage Relation Page - User Role:', currentUserRole, 'Is Parent:', isParent, 'Is Child:', isChild);
   
-  const [activeTab, setActiveTab] = useState("Parents");
+  const [activeTab, setActiveTab] = useState(() => {
+    // Child users start with "My Parents" tab
+    if (currentUserRole === ROLES.CHILD) {
+      return "My Parents";
+    }
+    // Other roles start with "Parents" tab
+    return "Parents";
+  });
   const [activeRequestTab, setActiveRequestTab] = useState("Received");
   const [open, setOpen] = useState(false);
   const [editModalOpen, setEditModalOpen] = useState(false);

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import { Box, Button } from "@mui/material";
 import { FaList } from "react-icons/fa";
 import { FiGrid } from "react-icons/fi";
@@ -22,6 +22,8 @@ import GroupModal from "../components/groupModal/GroupModal";
 import Fetcher from "../library/Fetcher";
 import { toast } from "react-toastify";
 import { getAllGroups, searchPublicGroups, joinPublicGroup, respondToGroupInvitation } from "../api/groupsApi";
+import useUserStore from "../store/userStore";
+import { ROLES, hasPermission } from "../utils/rolePermissions";
 
 const style = {
   position: "absolute",
@@ -39,6 +41,14 @@ const style = {
 };
 
 export default function GroupPage() {
+  // Get current user data and role for role-based restrictions
+  const { userData } = useUserStore();
+  const currentUserRole = userData?.user?.role?.name;
+  const canCreateMonitoringGroup = hasPermission(currentUserRole, 'CREATE_MONITORING_GROUP');
+  
+  // Debug logging for role-based restrictions
+  console.log('Group Page - User Role:', currentUserRole, 'Can Create Monitoring Group:', canCreateMonitoringGroup);
+  
   const [gridView, setGridView] = useState(true);
   const [listView, setListView] = useState(false);
   const [activeTab, setActiveTab] = useState("My Groups");
@@ -363,9 +373,11 @@ const navigate = useNavigate();
                 )}
               </div>
 
-              <div className="add-groups bg-primary cursor-pointer" onClick={handleOpen}>
-                <MdAdd className="filter-icon-btn text-white" />
-              </div>
+              {canCreateMonitoringGroup && (
+                <div className="add-groups bg-primary cursor-pointer" onClick={handleOpen}>
+                  <MdAdd className="filter-icon-btn text-white" />
+                </div>
+              )}
             </div>
           </div>
         </div>

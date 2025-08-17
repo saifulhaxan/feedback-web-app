@@ -1,5 +1,5 @@
 import { Button } from "@mui/material";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import { FaList } from "react-icons/fa";
 import { FiGrid } from "react-icons/fi";
 import { FaCirclePlus } from "react-icons/fa6";
@@ -38,6 +38,7 @@ import useUserStore from "../store/userStore";
 import { PiCodesandboxLogo } from "react-icons/pi";
 import { MdEdit } from "react-icons/md";
 import Fetcher from "../library/Fetcher";
+import { ROLES } from "../utils/rolePermissions";
 
 const style = {
   position: "absolute",
@@ -126,6 +127,8 @@ function ProjectPage() {
   };
 
   const userId = useUserStore((state) => state.userData?.user?.id);
+  const userRole = useUserStore((state) => state.userData?.user?.role?.name);
+  const isChild = userRole === ROLES.CHILD;
 
   // console.log(userId, "User ID");
 
@@ -737,26 +740,30 @@ function ProjectPage() {
 
         {/* ---------- Tabs ---------- */}
         <div className="connection-btn-wrap d-flex mb-3">
-          {["All", "Shared"].map((tab) => (
-            <Button
-              key={tab}
-              sx={{
-                textTransform: "none",
-                bgcolor: activeTab === tab ? "#EBF5FF" : "white",
-                color: activeTab === tab ? "#0064D1" : "black",
-                fontWeight: "bold",
-              }}
-              className="me-2"
-              name={tab}
-              onClick={handleSwitchTabs}
-            >
-              {tab}
-            </Button>
-          ))}
+          {(() => {
+            // Child users only see "My" and "Shared" tabs
+            const tabs = isChild ? ["My", "Shared"] : ["All", "Shared"];
+            return tabs.map((tab) => (
+              <Button
+                key={tab}
+                sx={{
+                  textTransform: "none",
+                  bgcolor: activeTab === tab ? "#EBF5FF" : "white",
+                  color: activeTab === tab ? "#0064D1" : "black",
+                  fontWeight: "bold",
+                }}
+                className="me-2"
+                name={tab}
+                onClick={handleSwitchTabs}
+              >
+                {tab}
+              </Button>
+            ));
+          })()}
         </div>
 
         {/* ---------- Content Cards ---------- */}
-        {activeTab === "All" && (
+        {(activeTab === "All" || activeTab === "My") && (
           <div className="row">
             {!projectData || projectData.length === 0 ? (
               <div className="col-lg-12 text-center py-5">
@@ -778,24 +785,26 @@ function ProjectPage() {
         {activeTab === "Shared" && (
           <>
             <div className="connection-btn-wrap d-flex mb-3">
-              {["me", "by"].map((tab) => (
-                <Button
-                  key={tab}
-                  sx={{
-                    textTransform: "none",
-                    bgcolor: innerActiveTab === tab ? "#EBF5FF" : "white",
-                    color: innerActiveTab === tab ? "#0064D1" : "black",
-                    fontWeight: "bold",
-                  }}
-                  className="me-2"
-                  name={tab}
-                  onClick={handleInnerSwitchTabs}
-                >
-                  {tab === "me" ? "Shared with me" : "Shared by me"}
-                </Button>
-              ))}
-
-
+              {(() => {
+                // Child users only see "Shared with me" (no sub-tabs)
+                const subTabs = isChild ? ["me"] : ["me", "by"];
+                return subTabs.map((tab) => (
+                  <Button
+                    key={tab}
+                    sx={{
+                      textTransform: "none",
+                      bgcolor: innerActiveTab === tab ? "#EBF5FF" : "white",
+                      color: innerActiveTab === tab ? "#0064D1" : "black",
+                      fontWeight: "bold",
+                    }}
+                    className="me-2"
+                    name={tab}
+                    onClick={handleInnerSwitchTabs}
+                  >
+                    {tab === "me" ? "Shared with me" : "Shared by me"}
+                  </Button>
+                ));
+              })()}
             </div>
 
             <div className="row">

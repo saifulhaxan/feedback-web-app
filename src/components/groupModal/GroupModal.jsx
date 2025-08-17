@@ -7,6 +7,7 @@ import { toast } from "react-toastify";
 import useUserStore from "../../store/userStore";
 import { MdModeEdit } from "react-icons/md";
 import { Badge } from "react-bootstrap";
+import { hasPermission } from "../../utils/rolePermissions";
 
 const style = {
   position: "absolute",
@@ -48,6 +49,8 @@ export default function GroupModal({ open, onClose, onGroupCreated }) {
   const [groupType, setGroupType] = useState("NORMAL");
 
   const userData = useUserStore((state) => state.userData);
+  const userRole = userData?.user?.role?.name;
+  const canCreateMonitoringGroup = hasPermission(userRole, 'CREATE_MONITORING_GROUP');
 
   useEffect(() => {
     if (open) {
@@ -374,20 +377,22 @@ export default function GroupModal({ open, onClose, onGroupCreated }) {
                     Normal
                   </label>
                 </div>
-                <div className="form-check">
-                  <input
-                    className="form-check-input"
-                    type="radio"
-                    name="groupType"
-                    value="MONITORING"
-                    id="groupTypeMonitor"
-                    checked={groupType === "MONITORING"}
-                    onChange={(e) => setGroupType(e.target.value)}
-                  />
-                  <label className="form-check-label" htmlFor="groupTypeMonitor">
-                    Monitor
-                  </label>
-                </div>
+                {canCreateMonitoringGroup && (
+                  <div className="form-check">
+                    <input
+                      className="form-check-input"
+                      type="radio"
+                      name="groupType"
+                      value="MONITORING"
+                      id="groupTypeMonitor"
+                      checked={groupType === "MONITORING"}
+                      onChange={(e) => setGroupType(e.target.value)}
+                    />
+                    <label className="form-check-label" htmlFor="groupTypeMonitor">
+                      Monitor
+                    </label>
+                  </div>
+                )}
               </div>
             </div>
 

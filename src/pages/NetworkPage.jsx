@@ -19,6 +19,7 @@ import SearchConnectionModal from "../components/networkModal/SearchConnectionMo
 import UserProfileModal from "../components/networkModal/UserProfileModal";
 import Fetcher from "../library/Fetcher";
 import useUserStore from "../store/userStore";
+import { ROLES } from "../utils/rolePermissions";
 import {
   getAllConnections,
   getPendingConnectionRequests,
@@ -48,7 +49,7 @@ function NetworkPage() {
   // Get current user data and role
   const { userData } = useUserStore();
   const currentUserRole = userData?.user?.role?.name;
-  const isChild = currentUserRole === "CHILD";
+  const isChild = currentUserRole === ROLES.CHILD;
   
   // Debug logging for role-based restrictions
   console.log('Network Page - User Role:', currentUserRole, 'Is Child:', isChild);
