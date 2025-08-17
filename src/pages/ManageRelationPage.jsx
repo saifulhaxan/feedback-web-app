@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import { Box, Button, Modal, Avatar, Badge } from "@mui/material";
 import { MdAddCircle, MdModeEdit } from "react-icons/md";
 import { FaCheck } from "react-icons/fa";
@@ -22,7 +22,7 @@ import {
   cancelSecondaryParentRequest
 } from "../api/childApi";
 import { toast } from "react-toastify";
-import useUserStore from "../store/useUserStore";
+import useUserStore from "../store/userStore";
 
 
 const style = {
@@ -40,6 +40,14 @@ const style = {
 };
 
 export default function ManageRelationPage() {
+  // Get current user data and role for role-based restrictions
+  const { userData } = useUserStore();
+  const currentUserRole = userData?.user?.role?.name;
+  const isParent = currentUserRole === "PARENT";
+  
+  // Debug logging for role-based restrictions
+  console.log('Manage Relation Page - User Role:', currentUserRole, 'Is Parent:', isParent);
+  
   const [activeTab, setActiveTab] = useState("Parents");
   const [activeRequestTab, setActiveRequestTab] = useState("Received");
   const [open, setOpen] = useState(false);
@@ -202,14 +210,17 @@ export default function ManageRelationPage() {
 
   useEffect(() => {
     fetchChild();
-    fetchParents();
+    // Only fetch parents data if user is a parent
+    if (isParent) {
+      fetchParents();
+    }
     fetchRequests(false); // Fetch received requests
     fetchRequests(true);  // Fetch sent requests
-  }, [])
+  }, [isParent])
 
   // Refresh data when active tab changes
   useEffect(() => {
-    if (activeTab === "Parents") {
+    if (activeTab === "Parents" && isParent) {
       fetchParents();
     } else if (activeTab === "Children") {
       fetchChild();
@@ -217,7 +228,7 @@ export default function ManageRelationPage() {
       fetchRequests(false); // Fetch received requests
       fetchRequests(true);  // Fetch sent requests
     }
-  }, [activeTab])
+  }, [activeTab, isParent])
 
   const handleClose = () => {
     setFormData(initialFormData);
@@ -451,6 +462,23 @@ export default function ManageRelationPage() {
 
   const [innerTab, setInnerTab] = useState("MY");
 
+  // Role-based tab filtering
+  const availableTabs = useMemo(() => {
+    if (isParent) {
+      // Parents can see all tabs
+      return ["Parents", "Children", "Requests"];
+    }
+    // Non-parents (children) can only see Children and Requests
+    return ["Children", "Requests"];
+  }, [isParent]);
+
+  // Ensure active tab is valid for current user role
+  useEffect(() => {
+    if (!availableTabs.includes(activeTab)) {
+      setActiveTab("Children"); // Default to Children tab for non-parents
+    }
+  }, [availableTabs, activeTab]);
+
 console.log('myChildrenArr', myParentArr)
 
 
@@ -468,23 +496,30 @@ console.log('myChildrenArr', myParentArr)
         </div>
 
         <div className="connection-btns-line d-flex align-items-center justify-content-between mt-4 mb-4">
-          <div className="connection-btn-wrap d-flex">
-            {["Parents", "Children", "Requests"].map((tab) => (
-              <Button
-                key={tab}
-                sx={{
-                  textTransform: "none",
-                  bgcolor: activeTab === tab ? "#EBF5FF" : "white",
-                  color: activeTab === tab ? "#0064D1" : "black",
-                  fontWeight: "bold",
-                }}
-                className="me-2"
-                name={tab}
-                onClick={handleSwitchTabs}
-              >
-                {tab}
-              </Button>
-            ))}
+          <div>
+            <div className="connection-btn-wrap d-flex">
+              {availableTabs.map((tab) => (
+                <Button
+                  key={tab}
+                  sx={{
+                    textTransform: "none",
+                    bgcolor: activeTab === tab ? "#EBF5FF" : "white",
+                    color: activeTab === tab ? "#0064D1" : "black",
+                    fontWeight: "bold",
+                  }}
+                  className="me-2"
+                  name={tab}
+                  onClick={handleSwitchTabs}
+                >
+                  {tab}
+                </Button>
+              ))}
+            </div>
+            {!isParent && (
+              <p className="text-muted mb-0 mt-2" style={{ fontSize: '14px' }}>
+                As a child account, you can only manage your children and requests.
+              </p>
+            )}
           </div>
         </div>
 

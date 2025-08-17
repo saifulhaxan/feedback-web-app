@@ -26,12 +26,44 @@ export const stepProject = async (data) => {
       projectId: data.projectId,
       startTime: data.startTime,
       endTime: data.endTime,
-      stepsPerHour: data.stepsPerHour,
+      stepsPerHour: data.stepsPerHour, // Already a string from the component
       breakTime: data.breakTime,
       beepAudio: data.beepAudio,
       popupText: data.popupText,
     };
     return Fetcher.post("user/stepConfig", payload);
+  }
+};
+
+// New function for conditional step config API calls
+export const createOrUpdateStepConfig = async (data, isCongfig = false) => {
+  if (data instanceof FormData) {
+    // If isCongfig is true, use PUT method (update existing)
+    if (isCongfig) {
+      const projectId = data.get('projectId');
+      return Fetcher.put(`user/stepConfig/${projectId}`, data);
+    } else {
+      // If isCongfig is false, use POST method (create new)
+      return Fetcher.post("user/stepConfig", data);
+    }
+  } else {
+    const payload = {
+      projectId: data.projectId,
+      startTime: data.startTime,
+      endTime: data.endTime,
+      stepsPerHour: data.stepsPerHour, // Already a string from the component
+      breakTime: data.breakTime,
+      beepAudio: data.beepAudio,
+      popupText: data.popupText,
+    };
+    
+    // If isCongfig is true, use PUT method (update existing)
+    if (isCongfig) {
+      return Fetcher.put(`user/stepConfig/${data.projectId}`, payload);
+    } else {
+      // If isCongfig is false, use POST method (create new)
+      return Fetcher.post("user/stepConfig", payload);
+    }
   }
 };
 
@@ -52,7 +84,21 @@ export const editProjectBasic = async ({ id, formData }) => {
 };
 
 export const editProjectSettings = async ({ id, formData }) => {
-  return Fetcher.put(`user/stepConfig/${id}`, formData);
+  if (formData instanceof FormData) {
+    return Fetcher.put(`user/stepConfig/${id}`, formData);
+  } else {
+    // Handle JSON data
+    const payload = {
+      projectId: formData.projectId,
+      startTime: formData.startTime,
+      endTime: formData.endTime,
+      stepsPerHour: formData.stepsPerHour, // Already a string from the component
+      breakTime: formData.breakTime,
+      beepAudio: formData.beepAudio,
+      popupText: formData.popupText,
+    };
+    return Fetcher.put(`user/stepConfig/${id}`, payload);
+  }
 };
 
 // Get relationship types (for child management)
@@ -128,6 +174,7 @@ export const updateProjectProgress = async (projectId, progress) => {
 export default {
   createProject,
   stepProject,
+  createOrUpdateStepConfig,
   getAllProjects,
   deleteProject,
   editProject,

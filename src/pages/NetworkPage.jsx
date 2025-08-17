@@ -18,6 +18,7 @@ import { BiBorderRadius } from "react-icons/bi";
 import SearchConnectionModal from "../components/networkModal/SearchConnectionModal";
 import UserProfileModal from "../components/networkModal/UserProfileModal";
 import Fetcher from "../library/Fetcher";
+import useUserStore from "../store/userStore";
 import {
   getAllConnections,
   getPendingConnectionRequests,
@@ -44,6 +45,14 @@ const style = {
 };
 
 function NetworkPage() {
+  // Get current user data and role
+  const { userData } = useUserStore();
+  const currentUserRole = userData?.user?.role?.name;
+  const isChild = currentUserRole === "CHILD";
+  
+  // Debug logging for role-based restrictions
+  console.log('Network Page - User Role:', currentUserRole, 'Is Child:', isChild);
+  
   const [gridView, setGridView] = useState(true);
   const [listView, setListView] = useState(false);
   const [selectedFilters, setSelectedFilters] = useState([]);
@@ -106,32 +115,74 @@ function NetworkPage() {
     );
   };
 
-  // Filtered views
+  // Role-based tab filtering
+  const availableTabs = useMemo(() => {
+    if (isChild) {
+      // Children can only see connections and suggestions
+      return ["connections", "suggestions"];
+    }
+    // Parents can see all tabs
+    return ["connections", "suggestions", "requests"];
+  }, [isChild]);
+
+  // Filtered views with role-based restrictions
   const filteredConnections = useMemo(() => {
-    return myConnections.filter((c) => matchesUser(c?.user || c, debouncedConnectionsQuery));
-  }, [myConnections, debouncedConnectionsQuery]);
+    let connections = myConnections;
+    
+    // If child user, only show parent connections
+    if (isChild) {
+      connections = connections.filter((c) => {
+        const user = c?.user || c;
+        return user?.role?.name === "PARENT";
+      });
+    }
+    
+    return connections.filter((c) => matchesUser(c?.user || c, debouncedConnectionsQuery));
+  }, [myConnections, debouncedConnectionsQuery, isChild]);
 
   const groupedSuggestions = useMemo(() => {
     const list = Array.isArray(suggestions) ? suggestions : [];
     return list.reduce((acc, item) => {
       const groupName = item?.ConnectAs?.name || "Other";
       const usersInItem = Array.isArray(item?.users) ? item.users : [];
-      const usersMatched = usersInItem.filter((u) => matchesUser(u, debouncedSuggestionsQuery));
+      
+      // Apply role-based filtering for suggestions
+      let filteredUsers = usersInItem;
+      if (isChild) {
+        // If child user, only show parent suggestions
+        filteredUsers = usersInItem.filter((u) => u?.role?.name === "PARENT");
+      }
+      
+      const usersMatched = filteredUsers.filter((u) => matchesUser(u, debouncedSuggestionsQuery));
       if (usersMatched.length > 0) {
         if (!acc[groupName]) acc[groupName] = [];
         usersMatched.forEach((user) => acc[groupName].push({ ...item, users: [user] }));
       }
       return acc;
     }, {});
-  }, [suggestions, debouncedSuggestionsQuery]);
+  }, [suggestions, debouncedSuggestionsQuery, isChild]);
 
   const filteredReceived = useMemo(() => {
-    return myRequests.filter((r) => matchesUser(r?.sentBy, debouncedReceivedQuery));
-  }, [myRequests, debouncedReceivedQuery]);
+    let requests = myRequests;
+    
+    // If child user, only show parent requests
+    if (isChild) {
+      requests = requests.filter((r) => r?.sentBy?.role?.name === "PARENT");
+    }
+    
+    return requests.filter((r) => matchesUser(r?.sentBy, debouncedReceivedQuery));
+  }, [myRequests, debouncedReceivedQuery, isChild]);
 
   const filteredSent = useMemo(() => {
-    return sentRequests.filter((r) => matchesUser(r?.receivedBy, debouncedSentQuery));
-  }, [sentRequests, debouncedSentQuery]);
+    let requests = sentRequests;
+    
+    // If child user, only show parent requests
+    if (isChild) {
+      requests = requests.filter((r) => r?.receivedBy?.role?.name === "PARENT");
+    }
+    
+    return requests.filter((r) => matchesUser(r?.receivedBy, debouncedSentQuery));
+  }, [sentRequests, debouncedSentQuery, isChild]);
 
   // Fetch functions: do not pass query params
   const fetchConnections = (isLoadMore = false) => {
@@ -217,6 +268,13 @@ function NetworkPage() {
   const toggleDrawer = (newOpen) => () => {
     setOpen(newOpen);
   };
+
+  // Ensure active tab is valid for current user role
+  useEffect(() => {
+    if (!availableTabs.includes(activeTab)) {
+      setActiveTab("connections");
+    }
+  }, [availableTabs, activeTab]);
 
   useEffect(() => {
     fetchRequests();
@@ -418,7 +476,14 @@ function NetworkPage() {
           </div>
           <div className="col-lg-9 main_wrapper">
             <div className="heading_wrapper d-flex align-items-center justify-content-between mt-4 mb-4">
-              <h1>Connections</h1>
+              <div>
+                <h1>Connections</h1>
+                {isChild && (
+                  <p className="text-muted mb-0" style={{ fontSize: '14px' }}>
+                    As a child account, you can only view and connect with parent accounts.
+                  </p>
+                )}
+              </div>
               <div className="viewbtns">
                 <Button className={`viewBtn1 ${listView ? "viewActiveBtn" : ""}`} onClick={changeToList}>
                   <FaList className={`viewBtn1 ${listView ? "listViewActive" : "listView"}`} />
@@ -431,7 +496,7 @@ function NetworkPage() {
 
             <div className="connection-btns-line d-flex align-items-center justify-content-between mt-4 mb-4">
               <div className="connection-btn-wrap d-flex">
-                {["connections", "suggestions", "requests"].map((tab) => (
+                {availableTabs.map((tab) => (
                   <Button
                     key={tab}
                     sx={{
