@@ -14,7 +14,7 @@ import Modal from "@mui/material/Modal";
 import Box from "@mui/material/Box";
 import CircularProgress from "@mui/material/CircularProgress";
 import axios from "axios";
-import { deleteProject } from "../api/projectApi";
+import { deleteProject, startProject } from "../api/projectApi";
 import { useMutation } from "@tanstack/react-query";
 import { toast } from "react-toastify";
 import SearchProjectShareModal from "./projectModal/SearchProjectShareModal";
@@ -36,12 +36,13 @@ const style = {
   overflow: "hidden",
 };
 
-const ProjectCard = ({ projectData, index, onEdit, onDeleted, userData, sharedWithUsers, sharedBy }) => {
+const ProjectCard = ({ projectData, index, onEdit, onDeleted, userData, sharedWithUsers, sharedBy, hideActions = false }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [isProgressExpanded, setIsProgressExpanded] = useState(false);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [shareModalOpen, setShareModalOpen] = useState(false);
   const [userProfileModal, setUserProfileModal] = useState({ open: false, userId: null, userData: null });
+  const [startConfirmModalOpen, setStartConfirmModalOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   console.log('projectData', sharedWithUsers);
 
@@ -56,6 +57,32 @@ const ProjectCard = ({ projectData, index, onEdit, onDeleted, userData, sharedWi
 
   const handleShareModalClose = () => {
     setShareModalOpen(false);
+  };
+
+  const handleStart = () => {
+    setStartConfirmModalOpen(true);
+  };
+
+  const handleStartConfirm = async () => {
+    const id = projectData?.project?.id || projectData?.id;
+    const alreadyStarted = projectData?.project?.isStarted ?? projectData?.isStarted;
+    try {
+      setLoading(true);
+      if (!alreadyStarted) {
+        await startProject(id);
+        toast.success("Project started successfully");
+      }
+      navigate(`/solution-function?projectId=${id}`);
+    } catch (e) {
+      toast.error(e?.response?.data?.message || "Failed to start project");
+    } finally {
+      setLoading(false);
+      setStartConfirmModalOpen(false);
+    }
+  };
+
+  const handleStartCancel = () => {
+    setStartConfirmModalOpen(false);
   };
 
   const handleShareSuccess = () => {
@@ -166,7 +193,7 @@ const ProjectCard = ({ projectData, index, onEdit, onDeleted, userData, sharedWi
             {sharedWithUsers && sharedWithUsers.length > 0 && (
               <div style={{ marginBottom: "15px" }}>
                 {/* <h6 style={{ fontSize: "14px", marginBottom: "8px", color: "#666" }}>Shared With:</h6> */}
-                <SharedUsersDisplay sharedUsers={sharedWithUsers} maxDisplay={5} />
+                <SharedUsersDisplay sharedUsers={sharedWithUsers} maxDisplay={5} displayStyle="centered" />
               </div>
             )}
 
@@ -227,52 +254,61 @@ const ProjectCard = ({ projectData, index, onEdit, onDeleted, userData, sharedWi
               Solution:{" "}
               <span className="pc-success">{projectData.solution || projectData?.project?.solution}</span>
             </p>
-            <p className="mb-1">
-              Solution Function:{" "}
-              <span className="pc-success">{projectData.solutionFunction || projectData?.project?.solutionFunction}</span>
-            </p>
+                         <p className="mb-1">
+               Solution Function:{" "}
+               <span className="pc-success">{projectData.solutionFunction || projectData?.project?.solutionFunction}</span>
+             </p>
 
-            <Collapse in={isExpanded}>
-              <div>
-                <p className="mb-1">
-                  Start Date:{" "}
-                  <span className="pc-grey">
-                    {formatDateTime(projectData?.stepConfig?.startTime || projectData?.project?.stepConfig?.startTime)}
-                  </span>
-                </p>
-                <p className="mb-1">
-                  End Date:{" "}
-                  <span className="pc-grey">
-                    {formatDateTime(projectData?.stepConfig?.endTime || projectData?.project?.stepConfig?.endTime)}
-                  </span>
-                </p>
+             {/* Project Image - Always visible */}
+             {(projectData?.fullImageUrl || projectData?.project?.fullImageUrl) && (
+               <div style={{ marginTop: "10px" }}>
+                 <h6>Project Image</h6>
+                 <img
+                   src={projectData.fullImageUrl || projectData?.project?.fullImageUrl}
+                   alt="Project"
+                   style={{
+                     width: "100%",
+                     maxHeight: "200px",
+                     objectFit: "cover",
+                     borderRadius: "8px",
+                     marginBottom: "10px",
+                   }}
+                 />
+               </div>
+             )}
 
-                <p className="mb-1">
-                  Total Feedback Requested: <span className="pc-info">10</span>
-                </p>
-                <p className="mb-1">
-                  Total Feedback Received: <span className="pc-info">10</span>
-                </p>
-                <p className="mb-1">
-                  Total Feedback Applied: <span className="pc-info">10</span>
-                </p>
+                          <Collapse in={isExpanded}>
+               <div>
+                 {!hideActions && (
+                   <>
+                     <p className="mb-1">
+                       Start Date:{" "}
+                       <span className="pc-grey">
+                         {formatDateTime(projectData?.stepConfig?.startTime || projectData?.project?.stepConfig?.startTime)}
+                       </span>
+                     </p>
+                     <p className="mb-1">
+                       End Date:{" "}
+                       <span className="pc-grey">
+                         {formatDateTime(projectData?.stepConfig?.endTime || projectData?.project?.stepConfig?.endTime)}
+                       </span>
+                     </p>
+                   </>
+                 )}
 
-                {(projectData?.fullImageUrl || projectData?.project?.fullImageUrl) && (
-                  <div style={{ marginTop: "10px" }}>
-                    <h6>Project Image</h6>
-                    <img
-                      src={projectData.fullImageUrl || projectData?.project?.fullImageUrl}
-                      alt="Project"
-                      style={{
-                        width: "100%",
-                        maxHeight: "200px",
-                        objectFit: "cover",
-                        borderRadius: "8px",
-                        marginBottom: "10px",
-                      }}
-                    />
-                  </div>
-                )}
+                                   {!hideActions && (
+                    <>
+                      <p className="mb-1">
+                        Total Feedback Requested: <span className="pc-info">10</span>
+                      </p>
+                      <p className="mb-1">
+                        Total Feedback Received: <span className="pc-info">10</span>
+                      </p>
+                      <p className="mb-1">
+                        Total Feedback Applied: <span className="pc-info">10</span>
+                      </p>
+                    </>
+                                     )}
 
                 {/* ✅ Youtube Video Embed */}
                 {projectData && (projectData.youtubeLink || projectData.project?.youtubeLink) &&
@@ -325,63 +361,119 @@ const ProjectCard = ({ projectData, index, onEdit, onDeleted, userData, sharedWi
               Status: <span className="pc-info">{projectData?.status || projectData?.project?.status}</span>
             </p>
 
-            <Button
-              variant="primary"
-              className="mb-2 pc-feedback-btn"
-              onClick={() => navigate("/request-feedback")}
-            >
-              Request Feedback
-            </Button>
+                         {!hideActions && (
+               <Button
+                 variant="primary"
+                 className="mb-2 pc-feedback-btn"
+                 onClick={() => navigate("/request-feedback")}
+               >
+                 Request Feedback
+               </Button>
+             )}
           </div>
 
           <Collapse in={isExpanded}>
             <div>
-              <div className="d-flex justify-content-between align-items-center pc-share-row px-2 py-2">
-                <div className="d-flex gap-2 align-items-center">
-                  <button className="transparent-btn" onClick={handleEditClick}>
-                    <MdEdit
-                      style={{ cursor: "pointer", marginRight: "10px" }}
-                    />
-                  </button>
-                  <button
-                    className="transparent-btn"
-                    onClick={handleDeleteClick}
-                  >
-                    <MdDelete
-                      style={{ cursor: "pointer", marginRight: "10px" }}
-                    />
-                  </button>
-                  <button
-                    className="transparent-btn"
-                    onClick={handleShareClick}
-                    >
-                    <MdShare style={{ cursor: "pointer" }} />
-                  </button>
-                </div>
-                <Button
-                  variant="primary"
-                  onClick={() => navigate("/solution-function")}
-                >
-                  Start
-                </Button>
-              </div>
+                             {!hideActions && (
+                 <div className="d-flex justify-content-between align-items-center pc-share-row px-2 py-2">
+                                       <div className="d-flex gap-2 align-items-center">
+                      <button 
+                        className="transparent-btn" 
+                        onClick={handleEditClick}
+                        disabled={projectData?.isStarted || projectData?.project?.isStarted || projectData?.isExpired || projectData?.project?.isExpired || projectData?.isCompleted || projectData?.project?.isCompleted}
+                        style={{ 
+                          cursor: (projectData?.isStarted || projectData?.project?.isStarted || projectData?.isExpired || projectData?.project?.isExpired || projectData?.isCompleted || projectData?.project?.isCompleted) ? "not-allowed" : "pointer",
+                          opacity: (projectData?.isStarted || projectData?.project?.isStarted || projectData?.isExpired || projectData?.project?.isExpired || projectData?.isCompleted || projectData?.project?.isCompleted) ? 0.5 : 1,
+                          marginRight: "10px" 
+                        }}
+                      >
+                        <MdEdit />
+                      </button>
+                      <button
+                        className="transparent-btn"
+                        onClick={handleDeleteClick}
+                        disabled={projectData?.isStarted || projectData?.project?.isStarted || projectData?.isExpired || projectData?.project?.isExpired || projectData?.isCompleted || projectData?.project?.isCompleted}
+                        style={{ 
+                          cursor: (projectData?.isStarted || projectData?.project?.isStarted || projectData?.isExpired || projectData?.project?.isExpired || projectData?.isCompleted || projectData?.project?.isCompleted) ? "not-allowed" : "pointer",
+                          opacity: (projectData?.isStarted || projectData?.project?.isStarted || projectData?.isExpired || projectData?.project?.isExpired || projectData?.isCompleted || projectData?.project?.isCompleted) ? 0.5 : 1,
+                          marginRight: "10px" 
+                        }}
+                      >
+                        <MdDelete />
+                      </button>
+                     <button
+                       className="transparent-btn"
+                       onClick={handleShareClick}
+                       >
+                       <MdShare style={{ cursor: "pointer" }} />
+                     </button>
+                   </div>
+                                                                               <Button
+                       variant={
+                         projectData?.isStarted || projectData?.project?.isStarted ? "warning" :
+                         projectData?.isExpired || projectData?.project?.isExpired ? "danger" :
+                         projectData?.isCompleted || projectData?.project?.isCompleted ? "success" : "primary"
+                       }
+                       onClick={handleStart}
+                       disabled={loading || projectData?.isStarted || projectData?.project?.isStarted || projectData?.isExpired || projectData?.project?.isExpired || projectData?.isCompleted || projectData?.project?.isCompleted}
+                     >
+                       {projectData?.isStarted || projectData?.project?.isStarted ? "Started" : 
+                        projectData?.isExpired || projectData?.project?.isExpired ? "Expired" :
+                        projectData?.isCompleted || projectData?.project?.isCompleted ? "Completed" : "Start"}
+                     </Button>
+                 </div>
+               )}
 
-              <div>
-                <div
-                  className="d-flex justify-content-between align-items-center px-2 py-2 pc-second-expand"
-                  onClick={toggleProgressExpand}
-                  style={{ cursor: "pointer" }}
-                >
-                  <h6>Check Progress</h6>
-                  {isProgressExpanded ? <AiOutlineUp /> : <AiOutlineDown />}
-                </div>
+                             {!hideActions && (
+                 <div>
+                   <div
+                     className="d-flex justify-content-between align-items-center px-2 py-2 pc-second-expand"
+                     onClick={toggleProgressExpand}
+                     style={{ cursor: "pointer" }}
+                   >
+                     <h6>Check Progress</h6>
+                     {isProgressExpanded ? <AiOutlineUp /> : <AiOutlineDown />}
+                   </div>
 
-                <Collapse in={isProgressExpanded}>
-                  <div className="px-2 py-2">
-                    <p>Progress details go here...</p>
-                  </div>
-                </Collapse>
-              </div>
+                                       <Collapse in={isProgressExpanded}>
+                      <div className="px-2 py-2">
+                        <p>Progress details go here...</p>
+                        
+                        {/* Navigation Arrow - Only show if project is started */}
+                        {(projectData?.isStarted || projectData?.project?.isStarted) && (
+                          <div className="text-center mt-3">
+                            <button
+                              onClick={() => navigate(`/solution-function?projectId=${projectData?.project?.id || projectData?.id}`)}
+                              className="btn btn-outline-primary btn-sm"
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '8px',
+                                margin: '0 auto'
+                              }}
+                            >
+                              <span>Go to Progress Screen</span>
+                              <svg 
+                                width="16" 
+                                height="16" 
+                                viewBox="0 0 24 24" 
+                                fill="none" 
+                                stroke="currentColor" 
+                                strokeWidth="2" 
+                                strokeLinecap="round" 
+                                strokeLinejoin="round"
+                              >
+                                <path d="M5 12h14"/>
+                                <path d="m12 5 7 7-7 7"/>
+                              </svg>
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </Collapse>
+                 </div>
+               )}
             </div>
           </Collapse>
         </Card.Body>
@@ -403,6 +495,34 @@ const ProjectCard = ({ projectData, index, onEdit, onDeleted, userData, sharedWi
             disabled={deleteProjectMutation.isLoading}
           >
             {deleteProjectMutation.isLoading ? "Deleting..." : "Delete"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Start Confirmation Modal */}
+      <Dialog open={startConfirmModalOpen} onClose={handleStartCancel}>
+        <DialogTitle>Are you sure you want to start the project?</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            By starting the project you can not edit start & end date time or any other detail of this project
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button 
+            onClick={handleStartConfirm}
+            variant="contained"
+            color="primary"
+            disabled={loading}
+            style={{ backgroundColor: '#1976d2', color: 'white' }}
+          >
+            {loading ? "Starting..." : "Start"}
+          </Button>
+          <Button 
+            onClick={handleEditClick}
+            variant="outlined"
+            style={{ border: '1px solid #ccc', color: 'black' }}
+          >
+            Edit
           </Button>
         </DialogActions>
       </Dialog>
@@ -463,29 +583,25 @@ const ProjectCard = ({ projectData, index, onEdit, onDeleted, userData, sharedWi
                   <h4 className="mb-1">
                     {userProfileModal.userData.firstname} {userProfileModal.userData.lastname}
                   </h4>
-                  <p className="text-muted mb-2">{userProfileModal.userData.email}</p>
-                  {userProfileModal.userData.role && (
-                    <span className="badge bg-primary me-2">{userProfileModal.userData.role.name}</span>
-                  )}
-                  {userProfileModal.userData.expertise && (
-                    <span className="badge bg-secondary">{userProfileModal.userData.expertise}</span>
-                  )}
+                                     <p className="text-muted mb-2">{userProfileModal.userData.email}</p>
+                   <div className="d-flex gap-2 justify-content-center">
+                     {userProfileModal.userData.expertise && (
+                       <span className="badge bg-primary">{userProfileModal.userData.expertise}</span>
+                     )}
+                     {userProfileModal.userData.title && (
+                       <span className="badge bg-secondary">{userProfileModal.userData.title}</span>
+                     )}
+                   </div>
                 </div>
 
                 {/* Contact Information */}
                 <div className="mb-4">
                   <h5 className="mb-3">Contact Information</h5>
                   <div className="row">
-                    <div className="col-md-6 mb-3">
-                      <strong>Email:</strong>
-                      <p className="text-muted mb-0">{userProfileModal.userData.email}</p>
-                    </div>
-                    {userProfileModal.userData.phone && (
-                      <div className="col-md-6 mb-3">
-                        <strong>Phone:</strong>
-                        <p className="text-muted mb-0">{userProfileModal.userData.phone}</p>
-                      </div>
-                    )}
+                                         <div className="col-md-6 mb-3">
+                       <strong>Email:</strong>
+                       <p className="text-muted mb-0">{userProfileModal.userData.email}</p>
+                     </div>
                     {userProfileModal.userData.location && (
                       <div className="col-md-6 mb-3">
                         <strong>Location:</strong>
@@ -552,29 +668,23 @@ const ProjectCard = ({ projectData, index, onEdit, onDeleted, userData, sharedWi
                 )}
 
                 {/* Statistics */}
-                <div className="mb-4">
-                  <h5 className="mb-3">Statistics</h5>
-                  <div className="row">
-                    <div className="col-md-4 text-center mb-3">
-                      <div className="border rounded p-3">
-                        <h4 className="text-primary mb-1">{userProfileModal.userData.totalConnections || 0}</h4>
-                        <small className="text-muted">Connections</small>
-                      </div>
-                    </div>
-                    <div className="col-md-4 text-center mb-3">
-                      <div className="border rounded p-3">
-                        <h4 className="text-success mb-1">{userProfileModal.userData.totalFeedback || 0}</h4>
-                        <small className="text-muted">Feedback Given</small>
-                      </div>
-                    </div>
-                    <div className="col-md-4 text-center mb-3">
-                      <div className="border rounded p-3">
-                        <h4 className="text-info mb-1">{userProfileModal.userData.totalProjects || 0}</h4>
-                        <small className="text-muted">Projects</small>
-                      </div>
-                    </div>
-                  </div>
-                </div>
+                                 <div className="mb-4">
+                   <h5 className="mb-3">Statistics</h5>
+                   <div className="row">
+                     <div className="col-md-6 text-center mb-3">
+                       <div className="border rounded p-3">
+                         <h4 className="text-success mb-1">{userProfileModal.userData.totalFeedbackProvided || 0}</h4>
+                         <small className="text-muted">Feedback Provided</small>
+                       </div>
+                     </div>
+                     <div className="col-md-6 text-center mb-3">
+                       <div className="border rounded p-3">
+                         <h4 className="text-info mb-1">{userProfileModal.userData.totalFeedbackReceived || 0}</h4>
+                         <small className="text-muted">Feedback Received</small>
+                       </div>
+                     </div>
+                   </div>
+                 </div>
 
                 {/* Additional Information */}
                 {userProfileModal.userData.createdAt && (

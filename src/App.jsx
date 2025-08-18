@@ -17,18 +17,20 @@ import FeedbackReceivedDetailModelPage from "./pages/FeedbackReceivedDetailModel
 import FeedbackReceivedDetailPage from "./pages/FeedbackReceivedDetailPage";
 import GroupPage from "./pages/GroupPage";
 import GroupDetailPage from "./pages/GroupDetailPage";
+import MonitoringGroupDetailPage from "./pages/MonitoringGroupDetailPage";
 import EditProfilePage from "./pages/EditProfilePage";
 import MyProfilePage from "./pages/MyProfilePage";
 import ManageRelationPage from "./pages/ManageRelationPage";
 import AddParentPage from "./pages/AddParentPage";
 import EditParentPage from "./pages/EditParentPage";
-import EditChildPage from "./pages/EditChildPage";
+
 import PaymentPage from "./pages/PaymentPage";
 import SolutionFunctionPage from "./pages/SolutionFunctionPage";
 import { ToastContainer } from "react-toastify";
 import ForgotPasswordVerify from "./pages/ForgotPasswordVerify";
 import PublicRoute from "./components/PublicRoute/Publicroute";
 import VerifyCodeChild from "./pages/verifyCodeChild";
+import RoleBasedRoute from "./components/RoleBasedRoute";
 // import { ToastContainer, toast } from "react-toastify";
 
 function App() {
@@ -99,11 +101,40 @@ function App() {
         <Route path="/my-profile" element={<MyProfilePage />} />
         <Route path="/edit-profile" element={<EditProfilePage />} />
         <Route path="/manage-relation" element={<ManageRelationPage />} />
-        <Route path="/groups" element={<GroupPage />} />
-        <Route path="/groups/:groupId" element={<GroupDetailPage />} />
-        <Route path="/add-parent" element={<AddParentPage />} />
+        <Route 
+          path="/groups" 
+          element={
+            <RoleBasedRoute requiredModule="groups">
+              <GroupPage />
+            </RoleBasedRoute>
+          } 
+        />
+        <Route 
+          path="/groups/:groupId" 
+          element={
+            <RoleBasedRoute requiredModule="groups">
+              <GroupDetailPage />
+            </RoleBasedRoute>
+          } 
+        />
+        <Route 
+          path="/monitoring-groups/:groupId" 
+          element={
+            <RoleBasedRoute requiredPermission="CREATE_MONITORING_GROUP">
+              <MonitoringGroupDetailPage />
+            </RoleBasedRoute>
+          } 
+        />
+        <Route 
+          path="/add-parent" 
+          element={
+            <RoleBasedRoute requiredPermission="ADD_CHILDREN">
+              <AddParentPage />
+            </RoleBasedRoute>
+          } 
+        />
         <Route path="/edit-parent/:parentId" element={<EditParentPage />} />
-        <Route path="/edit-child/:childId" element={<EditChildPage />} />
+
         <Route path="/payment" element={<PaymentPage />} />
         <Route path="/solution-function" element={<SolutionFunctionPage />} />
       </Routes>

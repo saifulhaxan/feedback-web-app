@@ -7,6 +7,7 @@ import { toast } from "react-toastify";
 import useUserStore from "../../store/userStore";
 import { MdModeEdit } from "react-icons/md";
 import { Badge } from "react-bootstrap";
+import { hasPermission } from "../../utils/rolePermissions";
 
 const style = {
   position: "absolute",
@@ -30,7 +31,7 @@ const getInitials = (firstname = "", lastname = "") => {
   return first + last;
 };
 
-export default function GroupModal({ open, onClose }) {
+export default function GroupModal({ open, onClose, onGroupCreated }) {
   const [nextStep, setNextStep] = useState(true);
   const [userFilters, setUserFilters] = useState([]);
   const [projectFilters, setProjectFilters] = useState([]);
@@ -48,6 +49,8 @@ export default function GroupModal({ open, onClose }) {
   const [groupType, setGroupType] = useState("NORMAL");
 
   const userData = useUserStore((state) => state.userData);
+  const userRole = userData?.user?.role?.name;
+  const canCreateMonitoringGroup = hasPermission(userRole, 'CREATE_MONITORING_GROUP');
 
   useEffect(() => {
     if (open) {
@@ -80,11 +83,10 @@ export default function GroupModal({ open, onClose }) {
   const fetchProjects = async () => {
     try {
       setLoadingProjects(true);
-      const data = await Fetcher.get("/user/projects");
-      const availableProjects = data.data?.data?.projects?.filter(project => 
-        !project.isUsedInMonitorGroup
-      ) || [];
-      setProjects(availableProjects);
+      const data = await Fetcher.get("/user/projects/shared?excludeMonitoringGroupProjects=true");
+      // Extract projects from sharedProjects array
+      const projects = data.data?.data?.sharedProjects?.map(item => item.project) || [];
+      setProjects(projects);
     } catch (error) {
       toast.error(error?.response?.data?.message || "Failed to fetch projects.");
     } finally {
@@ -144,6 +146,9 @@ export default function GroupModal({ open, onClose }) {
 
           setCreatedGroupData(data?.data?.data);
           toast.success(data?.data?.data?.message || "Monitor group created successfully!");
+          if (onGroupCreated) {
+            onGroupCreated();
+          }
           handleModalClose();
         } catch (error) {
           toast.error(error?.response?.data?.message || "Failed to create monitor group.");
@@ -181,6 +186,9 @@ export default function GroupModal({ open, onClose }) {
 
           setCreatedGroupData(data?.data?.data);
           toast.success(data?.data?.data?.message || "Group created successfully!");
+          if (onGroupCreated) {
+            onGroupCreated();
+          }
           handleModalClose();
         } catch (error) {
           toast.error(error?.response?.data?.message || "Failed to create group.");
@@ -194,10 +202,7 @@ export default function GroupModal({ open, onClose }) {
         return;
       }
 
-      if (!groupDescription.trim()) {
-        toast.error("Please enter a group description.");
-        return;
-      }
+      // Description is now optional - no validation needed
 
       setNextStep(false);
     }
@@ -372,20 +377,22 @@ export default function GroupModal({ open, onClose }) {
                     Normal
                   </label>
                 </div>
-                <div className="form-check">
-                  <input
-                    className="form-check-input"
-                    type="radio"
-                    name="groupType"
-                    value="MONITORING"
-                    id="groupTypeMonitor"
-                    checked={groupType === "MONITORING"}
-                    onChange={(e) => setGroupType(e.target.value)}
-                  />
-                  <label className="form-check-label" htmlFor="groupTypeMonitor">
-                    Monitor
-                  </label>
-                </div>
+                {canCreateMonitoringGroup && (
+                  <div className="form-check">
+                    <input
+                      className="form-check-input"
+                      type="radio"
+                      name="groupType"
+                      value="MONITORING"
+                      id="groupTypeMonitor"
+                      checked={groupType === "MONITORING"}
+                      onChange={(e) => setGroupType(e.target.value)}
+                    />
+                    <label className="form-check-label" htmlFor="groupTypeMonitor">
+                      Monitor
+                    </label>
+                  </div>
+                )}
               </div>
             </div>
 

@@ -1,5 +1,5 @@
 import { Button } from "@mui/material";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import { FaList } from "react-icons/fa";
 import { FiGrid } from "react-icons/fi";
 import { FaCirclePlus } from "react-icons/fa6";
@@ -18,6 +18,7 @@ import {
   getAllProjects, 
   getMyUser, 
   stepProject,
+  createOrUpdateStepConfig,
   getSharedProjects,
   getProjectsOverview,
   startProject,
@@ -37,6 +38,7 @@ import useUserStore from "../store/userStore";
 import { PiCodesandboxLogo } from "react-icons/pi";
 import { MdEdit } from "react-icons/md";
 import Fetcher from "../library/Fetcher";
+import { ROLES } from "../utils/rolePermissions";
 
 const style = {
   position: "absolute",
@@ -125,6 +127,8 @@ function ProjectPage() {
   };
 
   const userId = useUserStore((state) => state.userData?.user?.id);
+  const userRole = useUserStore((state) => state.userData?.user?.role?.name);
+  const isChild = userRole === ROLES.CHILD;
 
   // console.log(userId, "User ID");
 
@@ -268,10 +272,9 @@ function ProjectPage() {
       // Get the created project data
       const projectData = data?.data?.data?.project;
       setFirstStepData(projectData);
+      console.log('Project created - ID:', projectData?.id, 'Type:', typeof projectData?.id);
       getAllProjectsMutation.mutate();
       setModalTab(2);
-      
-
     },
     onError: (error) => {
       toast.error(error?.response?.data?.message || "Failed to create project");
@@ -283,10 +286,16 @@ function ProjectPage() {
   const editProjectBasicMutation = useMutation(editProjectBasic, {
     onSuccess: async (data) => {
       toast.success(data?.data?.data?.message || "Project basic info updated successfully!");
+      
+      // Store the isCongfig value from the response for step config submission
+      const projectData = data?.data?.data?.project || data?.data?.data;
+      if (projectData) {
+        setFirstStepData(projectData); // Update firstStepData with response
+        console.log('Project update response - isCongfig:', projectData.isCongfig);
+      }
+      
       getAllProjectsMutation.mutate();
       setModalTab(2); // Move to Step 2
-      
-
     },
     onError: (error) => {
       toast.error(error?.response?.data?.message || "Failed to update project basic info.");
@@ -430,25 +439,29 @@ function ProjectPage() {
     // Check if we want to use JSON format for stepConfig
     if (useStepConfigJsonFormat && !beepAudio) {
       // Use JSON format (your specified structure) when no file upload
+      const projectId = Number(editingProjectId || firstStepData?.id); // Convert to number
       const stepConfigData = {
-        projectId: editingProjectId || firstStepData?.id,
+        projectId: projectId,
         startTime: toISOString(startDate),
         endTime: toISOString(finishDate),
-        stepsPerHour: stepsPerHour,
+        stepsPerHour: Number(stepsPerHour), // Convert to number
         breakTime: toISOString(breakDate),
         beepAudio: "https://example.com/beep.mp3", // Default URL for JSON format
         popupText: popupText
       };
+      
+      console.log('Step config JSON data:', stepConfigData);
+      console.log('ProjectId type:', typeof projectId, 'Value:', projectId);
 
       if (editMode) {
         // For edit mode, still use FormData for consistency
     const formData = new FormData();
-        formData.append("projectId", editingProjectId || firstStepData?.id); // Use projectId as specified
+        formData.append("projectId", Number(editingProjectId || firstStepData?.id)); // Convert to number
     formData.append("startTime", toISOString(startDate));
     formData.append("endTime", toISOString(finishDate));
     formData.append("breakTime", toISOString(breakDate));
     formData.append("beepAtBreakTime", beepAtBreak);
-        formData.append("stepsPerHour", stepsPerHour);
+        formData.append("stepsPerHour", String(stepsPerHour)); // Convert to string as API expects
         formData.append("popupText", popupText);
 
         if (beepAudio) {
@@ -460,31 +473,88 @@ function ProjectPage() {
           formData,
         });
       } else {
-        // CREATE STEP CONFIG with JSON format
+        // CREATE STEP CONFIG with JSON format (always POST for new projects)
         secondStepMutation.mutate(stepConfigData);
       }
     } else {
-      // Use FormData for file uploads or when JSON format is not selected
-      const formData = new FormData();
-      formData.append("projectId", editingProjectId || firstStepData?.id); // Use projectId as specified
-      formData.append("startTime", toISOString(startDate));
-      formData.append("endTime", toISOString(finishDate));
-      formData.append("breakTime", toISOString(breakDate));
-      formData.append("beepAtBreakTime", beepAtBreak);
-      formData.append("stepsPerHour", stepsPerHour);
-    formData.append("popupText", popupText);
+      // Use FormData only when we have file uploads (beepAudio), otherwise use JSON format
+      if (beepAudio) {
+        // Use FormData for file uploads
+        const projectId = Number(editingProjectId || firstStepData?.id); // Convert to number
+        const formData = new FormData();
+        formData.append("projectId", projectId);
+        formData.append("startTime", toISOString(startDate));
+        formData.append("endTime", toISOString(finishDate));
+        formData.append("breakTime", toISOString(breakDate));
+        formData.append("beepAtBreakTime", beepAtBreak);
+        formData.append("stepsPerHour", String(stepsPerHour)); // Convert to string as API expects
+        formData.append("popupText", popupText);
+        formData.append("beepAudio", beepAudio);
+        
+        console.log('Step config FormData - ProjectId type:', typeof projectId, 'Value:', projectId);
 
-    if (beepAudio) {
-      formData.append("beepAudio", beepAudio);
-    }
+        if (editMode) {
+          // EDIT MODE: Check if project has isCongfig flag from PUT API response
+          const isCongfig = firstStepData?.isCongfig || false;
+          console.log('Step config submission - isCongfig from project update:', isCongfig);
+          
+          if (isCongfig) {
+            // If isCongfig is true, use PUT method (update existing step config)
+            console.log('Using PUT method for step config (isCongfig: true)');
+            editProjectSettingsMutation.mutate({
+              id: editingProjectId,
+              formData,
+            });
+          } else {
+            // If isCongfig is false, use POST method (create new step config)
+            console.log('Using POST method for step config (isCongfig: false)');
+            secondStepMutation.mutate(formData);
+          }
+        } else {
+          // CREATE MODE: Always use POST method for new projects
+          secondStepMutation.mutate(formData);
+        }
+      } else {
+        // Use JSON format when no file upload
+        const projectId = Number(editingProjectId || firstStepData?.id); // Convert to number
+        const stepConfigData = {
+          projectId: projectId,
+          startTime: toISOString(startDate),
+          endTime: toISOString(finishDate),
+          stepsPerHour: String(stepsPerHour), // Convert to string as API expects
+          breakTime: toISOString(breakDate),
+          beepAtBreakTime: beepAtBreak,
+          beepAudio: "https://example.com/beep.mp3", // Default URL for JSON format
+          popupText: popupText
+        };
+        
+        console.log('Step config JSON data (no file):', stepConfigData);
+        console.log('ProjectId type:', typeof projectId, 'Value:', projectId);
+        console.log('StepsPerHour type:', typeof stepConfigData.stepsPerHour, 'Value:', stepConfigData.stepsPerHour);
+        console.log('Raw projectId from firstStepData:', firstStepData?.id, 'Type:', typeof firstStepData?.id);
+        console.log('Raw editingProjectId:', editingProjectId, 'Type:', typeof editingProjectId);
 
-    if (editMode) {
-      editProjectSettingsMutation.mutate({
-        id: editingProjectId,
-        formData,
-      });
-    } else {
-      secondStepMutation.mutate(formData);
+        if (editMode) {
+          // EDIT MODE: Check if project has isCongfig flag from PUT API response
+          const isCongfig = firstStepData?.isCongfig || false;
+          console.log('Step config submission - isCongfig from project update:', isCongfig);
+          
+          if (isCongfig) {
+            // If isCongfig is true, use PUT method (update existing step config)
+            console.log('Using PUT method for step config (isCongfig: true)');
+            editProjectSettingsMutation.mutate({
+              id: editingProjectId,
+              formData: stepConfigData, // Send as JSON
+            });
+          } else {
+            // If isCongfig is false, use POST method (create new step config)
+            console.log('Using POST method for step config (isCongfig: false)');
+            secondStepMutation.mutate(stepConfigData); // Send as JSON
+          }
+        } else {
+          // CREATE MODE: Always use POST method for new projects
+          secondStepMutation.mutate(stepConfigData); // Send as JSON
+        }
       }
     }
   };
@@ -670,26 +740,30 @@ function ProjectPage() {
 
         {/* ---------- Tabs ---------- */}
         <div className="connection-btn-wrap d-flex mb-3">
-          {["All", "Shared"].map((tab) => (
-            <Button
-              key={tab}
-              sx={{
-                textTransform: "none",
-                bgcolor: activeTab === tab ? "#EBF5FF" : "white",
-                color: activeTab === tab ? "#0064D1" : "black",
-                fontWeight: "bold",
-              }}
-              className="me-2"
-              name={tab}
-              onClick={handleSwitchTabs}
-            >
-              {tab}
-            </Button>
-          ))}
+          {(() => {
+            // Child users only see "My" and "Shared" tabs
+            const tabs = isChild ? ["My", "Shared"] : ["All", "Shared"];
+            return tabs.map((tab) => (
+              <Button
+                key={tab}
+                sx={{
+                  textTransform: "none",
+                  bgcolor: activeTab === tab ? "#EBF5FF" : "white",
+                  color: activeTab === tab ? "#0064D1" : "black",
+                  fontWeight: "bold",
+                }}
+                className="me-2"
+                name={tab}
+                onClick={handleSwitchTabs}
+              >
+                {tab}
+              </Button>
+            ));
+          })()}
         </div>
 
         {/* ---------- Content Cards ---------- */}
-        {activeTab === "All" && (
+        {(activeTab === "All" || activeTab === "My") && (
           <div className="row">
             {!projectData || projectData.length === 0 ? (
               <div className="col-lg-12 text-center py-5">
@@ -711,24 +785,26 @@ function ProjectPage() {
         {activeTab === "Shared" && (
           <>
             <div className="connection-btn-wrap d-flex mb-3">
-              {["me", "by"].map((tab) => (
-                <Button
-                  key={tab}
-                  sx={{
-                    textTransform: "none",
-                    bgcolor: innerActiveTab === tab ? "#EBF5FF" : "white",
-                    color: innerActiveTab === tab ? "#0064D1" : "black",
-                    fontWeight: "bold",
-                  }}
-                  className="me-2"
-                  name={tab}
-                  onClick={handleInnerSwitchTabs}
-                >
-                  {tab === "me" ? "Shared with me" : "Shared by me"}
-                </Button>
-              ))}
-
-
+              {(() => {
+                // Child users only see "Shared with me" (no sub-tabs)
+                const subTabs = isChild ? ["me"] : ["me", "by"];
+                return subTabs.map((tab) => (
+                  <Button
+                    key={tab}
+                    sx={{
+                      textTransform: "none",
+                      bgcolor: innerActiveTab === tab ? "#EBF5FF" : "white",
+                      color: innerActiveTab === tab ? "#0064D1" : "black",
+                      fontWeight: "bold",
+                    }}
+                    className="me-2"
+                    name={tab}
+                    onClick={handleInnerSwitchTabs}
+                  >
+                    {tab === "me" ? "Shared with me" : "Shared by me"}
+                  </Button>
+                ));
+              })()}
             </div>
 
             <div className="row">
@@ -745,6 +821,7 @@ function ProjectPage() {
                         index={index} 
                         onEdit={handleEditProject} 
                         onDeleted={() => getAllProjectsMutation.mutate()} 
+                        hideActions={true}
                       />
                     </div>
                   ))
@@ -769,6 +846,7 @@ function ProjectPage() {
                           index={index} 
                           onEdit={handleEditProject} 
                           onDeleted={() => getAllProjectsMutation.mutate()} 
+                          hideActions={true}
                         />
                       </div>
                     ))

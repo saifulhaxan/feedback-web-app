@@ -17,6 +17,7 @@ import { IoIosCall } from "react-icons/io";
 import { IoIosLogOut } from "react-icons/io";
 import useUserStore from "../../store/userStore";
 import useTokenStore from "../../store/userToken";
+import { canAccessModule, getRoleDisplayName } from "../../utils/rolePermissions";
 
 function Header() {
   const [open, setOpen] = React.useState(false);
@@ -28,6 +29,9 @@ function Header() {
   const userData = useUserStore((state) => state.userData);
   const clearTokens = useTokenStore((state) => state.clearTokens);
   const tokens = useTokenStore((state) => state.tokens);
+  
+  // Get user role for navigation
+  const userRole = userData?.user?.role?.name;
 
   // Check if current page is part of registration flow
   const isRegistrationPage = () => {
@@ -129,6 +133,11 @@ function Header() {
                   <li className="mb-xl-0 mb-lg-0 me-5 mb-md-1 mb-sm-1 mb-2">
                     <Link to="/network">Network</Link>
                   </li>
+                  {canAccessModule(userRole, 'groups') && (
+                    <li className="mb-xl-0 mb-lg-0 me-5 mb-md-1 mb-sm-1 mb-2">
+                      <Link to="/groups">Groups</Link>
+                    </li>
+                  )}
                   <li>
                     <Link to="/status">Status</Link>
                   </li>
@@ -235,16 +244,18 @@ function Header() {
                 <li className="d-flex align-items-center drawer-list-li">
                   <Link to="/manage-relation">
                     <PiUsersThreeLight className="me-2" />
-                    My Parents
+                    {userRole === 'CHILD' ? 'My Parents' : 'My Children'}
                   </Link>
                 </li>
 
-                <li className="d-flex align-items-center drawer-list-li">
-                  <Link to="/groups">
-                    <LuUsers className="me-2" />
-                    Groups
-                  </Link>
-                </li>
+                {canAccessModule(userRole, 'groups') && (
+                  <li className="d-flex align-items-center drawer-list-li">
+                    <Link to="/groups">
+                      <LuUsers className="me-2" />
+                      Groups
+                    </Link>
+                  </li>
+                )}
               </ul>
             </div>
 

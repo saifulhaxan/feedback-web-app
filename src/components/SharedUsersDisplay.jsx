@@ -22,7 +22,7 @@ const style = {
   overflow: "hidden",
 };
 
-const SharedUsersDisplay = ({ sharedUsers = [], maxDisplay = 5 }) => {
+const SharedUsersDisplay = ({ sharedUsers = [], maxDisplay = 5, displayStyle = "horizontal" }) => {
   const [showAllUsers, setShowAllUsers] = useState(false);
   const [userProfileModal, setUserProfileModal] = useState({ open: false, userId: null, userData: null });
   const [loading, setLoading] = useState(false);
@@ -69,67 +69,133 @@ const SharedUsersDisplay = ({ sharedUsers = [], maxDisplay = 5 }) => {
 
   return (
     <>
-      <div className="d-flex align-items-center">
-        {/* Display users */}
-        {displayUsers.map((user, index) => (
-          <div
-            key={user.id}
-            className=""
-            style={{ cursor: "pointer" }}
-            onClick={() => handleUserClick(user.id)}
-            title={`${user.firstname} ${user.lastname}`}
-          >
-            {user.image ? (
-              <img
-                src={user.image?.startsWith("http") ? user.image : `https://feedbackwork.net/feedbackapi/${user.image}`}
-                alt={`${user.firstname} ${user.lastname}`}
-                className="rounded-circle"
-                style={{ 
-                  width: "42px", 
-                  height: "42px", 
-                  objectFit: "cover",
-                  border: "2px solid #fff",
-                  boxShadow: "0 2px 4px rgba(0,0,0,0.1)"
-                }}
-              />
-            ) : (
-              <div
-                className="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center"
-                style={{ 
-                  width: "42px", 
-                  height: "42px", 
-                  fontWeight: "bold",
-                  fontSize: "14px",
-                  border: "2px solid #fff",
-                  boxShadow: "0 2px 4px rgba(0,0,0,0.1)"
-                }}
-              >
-                {getInitials(`${user.firstname || ""} ${user.lastname || ""}`)}
-              </div>
-            )}
-          </div>
-        ))}
+      {displayStyle === "centered" ? (
+        // Centered style - similar to "Shared with me" tab
+        <div style={{ marginBottom: "20px", textAlign: "center" }}>
+          {displayUsers.map((user, index) => (
+            <div
+              key={user.id}
+              className="d-flex flex-column align-items-center"
+              style={{ cursor: "pointer" }}
+              onClick={() => handleUserClick(user.id)}
+              title={`View ${user.firstname} ${user.lastname}'s profile`}
+            >
+              {user.image ? (
+                <img
+                  src={user.image?.startsWith("http") ? user.image : `https://feedbackwork.net/feedbackapi/${user.image}`}
+                  alt={`${user.firstname} ${user.lastname}`}
+                  className="rounded-circle mb-2"
+                  style={{ 
+                    width: "80px", 
+                    height: "80px", 
+                    objectFit: "cover",
+                    border: "3px solid #fff",
+                    boxShadow: "0 4px 8px rgba(0,0,0,0.15)"
+                  }}
+                />
+              ) : (
+                <div
+                  className="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center mb-2"
+                  style={{ 
+                    width: "80px", 
+                    height: "80px", 
+                    fontWeight: "bold",
+                    fontSize: "32px",
+                    border: "3px solid #fff",
+                    boxShadow: "0 4px 8px rgba(0,0,0,0.15)"
+                  }}
+                >
+                  {getInitials(`${user.firstname || ""} ${user.lastname || ""}`)}
+                </div>
+              )}
+              <span style={{ 
+                fontSize: "18px", 
+                fontWeight: "bold", 
+                color: "#333",
+                textAlign: "center"
+              }}>
+                {user.firstname} {user.lastname}
+              </span>
+            </div>
+          ))}
+          
+          {/* Show remaining count if there are more users */}
+          {hasMoreUsers && (
+            <div className="mt-3">
+              <span style={{ 
+                fontSize: "16px", 
+                color: "#666",
+                fontStyle: "italic"
+              }}>
+                +{remainingCount} more users
+              </span>
+            </div>
+          )}
+        </div>
+      ) : (
+        // Horizontal style - original style
+        <div className="d-flex align-items-center">
+          {/* Display users */}
+          {displayUsers.map((user, index) => (
+            <div
+              key={user.id}
+              className=""
+              style={{ cursor: "pointer" }}
+              onClick={() => handleUserClick(user.id)}
+              title={`${user.firstname} ${user.lastname}`}
+            >
+              {user.image ? (
+                <img
+                  src={user.image?.startsWith("http") ? user.image : `https://feedbackwork.net/feedbackapi/${user.image}`}
+                  alt={`${user.firstname} ${user.lastname}`}
+                  className="rounded-circle"
+                  style={{ 
+                    width: "42px", 
+                    height: "42px", 
+                    objectFit: "cover",
+                    border: "2px solid #fff",
+                    boxShadow: "0 2px 4px rgba(0,0,0,0.1)"
+                  }}
+                />
+              ) : (
+                <div
+                  className="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center"
+                  style={{ 
+                    width: "42px", 
+                    height: "42px", 
+                    fontWeight: "bold",
+                    fontSize: "14px",
+                    border: "2px solid #fff",
+                    boxShadow: "0 2px 4px rgba(0,0,0,0.1)"
+                  }}
+                >
+                  {getInitials(`${user.firstname || ""} ${user.lastname || ""}`)}
+                </div>
+              )}
+            </div>
+          ))}
 
-        {/* Plus button for more users */}
-        {hasMoreUsers && (
-          <div
-            className="rounded-circle bg-light text-dark d-flex align-items-center justify-content-center me-2"
-            style={{ 
-              width: "32px", 
-              height: "32px", 
-              fontWeight: "bold",
-              fontSize: "12px",
-              cursor: "pointer",
-              border: "2px solid #fff",
-              boxShadow: "0 2px 4px rgba(0,0,0,0.1)"
-            }}
-            onClick={() => setShowAllUsers(true)}
-            title={`+${remainingCount} more`}
-          >
-            +{remainingCount}
-          </div>
-        )}
-      </div>
+          {/* Plus button for more users */}
+          {hasMoreUsers && (
+            <div
+              className="rounded-circle bg-light text-dark d-flex align-items-center justify-content-center me-2"
+              style={{ 
+                width: "32px", 
+                height: "32px", 
+                fontWeight: "bold",
+                fontSize: "12px",
+                cursor: "pointer",
+                border: "2px solid #fff",
+                boxShadow: "0 2px 4px rgba(0,0,0,0.1)"
+              }}
+              onClick={() => setShowAllUsers(true)}
+              title={`+${remainingCount} more`}
+            >
+              +{remainingCount}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* All Users Modal */}
       {showAllUsers && (
@@ -233,29 +299,25 @@ const SharedUsersDisplay = ({ sharedUsers = [], maxDisplay = 5 }) => {
                   <h4 className="mb-1">
                     {userProfileModal.userData.firstname} {userProfileModal.userData.lastname}
                   </h4>
-                  <p className="text-muted mb-2">{userProfileModal.userData.email}</p>
-                  {userProfileModal.userData.role && (
-                    <span className="badge bg-primary me-2">{userProfileModal.userData.role.name}</span>
-                  )}
-                  {userProfileModal.userData.expertise && (
-                    <span className="badge bg-secondary">{userProfileModal.userData.expertise}</span>
-                  )}
+                                     <p className="text-muted mb-2">{userProfileModal.userData.email}</p>
+                   <div className="d-flex gap-2 justify-content-center">
+                     {userProfileModal.userData.expertise && (
+                       <span className="badge bg-primary">{userProfileModal.userData.expertise}</span>
+                     )}
+                     {userProfileModal.userData.title && (
+                       <span className="badge bg-secondary">{userProfileModal.userData.title}</span>
+                     )}
+                   </div>
                 </div>
 
                 {/* Contact Information */}
                 <div className="mb-4">
                   <h5 className="mb-3">Contact Information</h5>
                   <div className="row">
-                    <div className="col-md-6 mb-3">
-                      <strong>Email:</strong>
-                      <p className="text-muted mb-0">{userProfileModal.userData.email}</p>
-                    </div>
-                    {userProfileModal.userData.phone && (
-                      <div className="col-md-6 mb-3">
-                        <strong>Phone:</strong>
-                        <p className="text-muted mb-0">{userProfileModal.userData.phone}</p>
-                      </div>
-                    )}
+                                         <div className="col-md-6 mb-3">
+                       <strong>Email:</strong>
+                       <p className="text-muted mb-0">{userProfileModal.userData.email}</p>
+                     </div>
                     {userProfileModal.userData.location && (
                       <div className="col-md-6 mb-3">
                         <strong>Location:</strong>
@@ -322,29 +384,23 @@ const SharedUsersDisplay = ({ sharedUsers = [], maxDisplay = 5 }) => {
                 )}
 
                 {/* Statistics */}
-                <div className="mb-4">
-                  <h5 className="mb-3">Statistics</h5>
-                  <div className="row">
-                    <div className="col-md-4 text-center mb-3">
-                      <div className="border rounded p-3">
-                        <h4 className="text-primary mb-1">{userProfileModal.userData.totalConnections || 0}</h4>
-                        <small className="text-muted">Connections</small>
-                      </div>
-                    </div>
-                    <div className="col-md-4 text-center mb-3">
-                      <div className="border rounded p-3">
-                        <h4 className="text-success mb-1">{userProfileModal.userData.totalFeedback || 0}</h4>
-                        <small className="text-muted">Feedback Given</small>
-                      </div>
-                    </div>
-                    <div className="col-md-4 text-center mb-3">
-                      <div className="border rounded p-3">
-                        <h4 className="text-info mb-1">{userProfileModal.userData.totalProjects || 0}</h4>
-                        <small className="text-muted">Projects</small>
-                      </div>
-                    </div>
-                  </div>
-                </div>
+                                 <div className="mb-4">
+                   <h5 className="mb-3">Statistics</h5>
+                   <div className="row">
+                     <div className="col-md-6 text-center mb-3">
+                       <div className="border rounded p-3">
+                         <h4 className="text-success mb-1">{userProfileModal.userData.totalFeedbackProvided || 0}</h4>
+                         <small className="text-muted">Feedback Provided</small>
+                       </div>
+                     </div>
+                     <div className="col-md-6 text-center mb-3">
+                       <div className="border rounded p-3">
+                         <h4 className="text-info mb-1">{userProfileModal.userData.totalFeedbackReceived || 0}</h4>
+                         <small className="text-muted">Feedback Received</small>
+                       </div>
+                     </div>
+                   </div>
+                 </div>
 
                 {/* Additional Information */}
                 {userProfileModal.userData.createdAt && (
