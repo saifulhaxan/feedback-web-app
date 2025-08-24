@@ -24,6 +24,7 @@ import {
 } from "../api/childApi";
 import { toast } from "react-toastify";
 import useUserStore from "../store/userStore";
+import useChildStore from "../store/useUserStore";
 import { ROLES } from "../utils/rolePermissions";
 
 
@@ -71,6 +72,7 @@ export default function ManageRelationPage() {
   const [editFormErrors, setEditFormErrors] = useState({});
 
   const setUser = useUserStore((state) => state.setUser);
+  const setChildUser = useChildStore((state) => state.setUser);
 
 
 
@@ -267,7 +269,7 @@ export default function ManageRelationPage() {
       fetchParents();
     } else if (activeTab === "Children") {
       fetchChild();
-    } else if (activeTab === "Requests") {
+            } else if (activeTab === "Request") {
       fetchRequests(false); // Fetch received requests
       fetchRequests(true);  // Fetch sent requests
     }
@@ -282,7 +284,7 @@ export default function ManageRelationPage() {
 
   // Refresh data when request tab changes
   useEffect(() => {
-    if (activeTab === "Requests") {
+    if (activeTab === "Request") {
       fetchRequests(false); // Fetch received requests
       fetchRequests(true);  // Fetch sent requests
     }
@@ -438,12 +440,10 @@ export default function ManageRelationPage() {
           // Show success toast
           toast.success("Child created successfully! OTP sent for verification.");
           
-          // Save to store
-          useUserStore.getState().setUserData({
-            user: {
-              childId: createdChild?.id,
-              email: createdChild?.email,
-            }
+          // Save child data to child store (not user store)
+          setChildUser({
+            childId: createdChild?.id,
+            email: createdChild?.email,
           });
 
           // Close modal and refresh data
@@ -550,20 +550,37 @@ export default function ManageRelationPage() {
 
   // Role-based tab filtering
   const availableTabs = useMemo(() => {
-    if (isParent) {
-      // Parents can see all tabs
-      return ["Parents", "Children", "Requests"];
+    if (isChild) {
+      // CHILD role: only show "Parent" tab (no inner tabs)
+      return ["Parent"];
+    } else if (isParent) {
+      // PARENT role: show "Parents", "Children", and "Request" with inner tabs
+      return ["Parents", "Children", "Request"];
+    } else {
+      // Regular/Teacher/Manager: show "Children" and "Request" without inner tabs
+      return ["Children", "Request"];
     }
-    // Non-parents (children) can only see Children and Requests
-    return ["Children", "Requests"];
-  }, [isParent]);
+  }, [isChild, isParent]);
 
   // Ensure active tab is valid for current user role
   useEffect(() => {
     if (!availableTabs.includes(activeTab)) {
-      setActiveTab("Children"); // Default to Children tab for non-parents
+      if (isChild) {
+        setActiveTab("Parent"); // Default to Parent tab for children
+      } else if (isParent) {
+        setActiveTab("Parents"); // Default to Parents tab for parents
+      } else {
+        setActiveTab("Children"); // Default to Children tab for others
+      }
     }
-  }, [availableTabs, activeTab]);
+  }, [availableTabs, activeTab, isChild, isParent]);
+
+  // Force "Received" tab for non-parent roles in Request tab
+  useEffect(() => {
+    if (activeTab === "Request" && !isParent && activeRequestTab !== "Received") {
+      setActiveRequestTab("Received");
+    }
+  }, [activeTab, isParent, activeRequestTab]);
 
 console.log('myChildrenArr', myParentArr)
 
@@ -609,18 +626,21 @@ console.log('myChildrenArr', myParentArr)
           </div>
         </div>
 
-        {activeTab === "Parents" && (
+        {(activeTab === "Parent" || activeTab === "Parents") && (
           <div className="relation-card-wrap">
-            <div className="group-card-wrapper pt-4 pb-4 mb-3 text-center d-flex align-items-center justify-content-center">
-              <div className="group-card">
-                <div className="image-wrapper">
-                  <div className="group-description-wrap cursor-pointer" onClick={() => navigate("/add-parent")}>
-                    <MdAddCircle className="text-primary add-relation-icon" />
-                    <p className="mb-0 fw-500 text-primary">Add Parent</p>
+            {/* Add Parent Card - only for PARENT role */}
+            {isParent && (
+              <div className="group-card-wrapper pt-4 pb-4 mb-3 text-center d-flex align-items-center justify-content-center">
+                <div className="group-card">
+                  <div className="image-wrapper">
+                    <div className="group-description-wrap cursor-pointer" onClick={() => navigate("/add-parent")}>
+                      <MdAddCircle className="text-primary add-relation-icon" />
+                      <p className="mb-0 fw-500 text-primary">Add Parent</p>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
+            )}
             {myParentArr.map((card) => (
               <div key={`${card.parent?.id}-${card.relationshipType?.id}`} className="group-card-wrapper pt-4 pb-4 mb-3 text-center">
                 <div className="group-card">
@@ -661,32 +681,37 @@ console.log('myChildrenArr', myParentArr)
 
         {activeTab === "Children" && (
           <>
-            <div className="mb-3 d-flex gap-3">
-              <button
-                className={`btn p-2 py-1 ${innerTab === "MY" ? "btn-primary" : "btn-outline-primary"}`}
-                onClick={() => setInnerTab("MY")}
-              >
-                MY
-              </button>
-              <button
-                className={`btn p-2 py-1 ${innerTab === "Linked" ? "btn-primary" : "btn-outline-primary"}`}
-                onClick={() => setInnerTab("Linked")}
-              >
-                Linked
-              </button>
-            </div>
+            {/* Show inner tabs only for PARENT role */}
+            {isParent && (
+              <div className="mb-3 d-flex gap-3">
+                <button
+                  className={`btn p-2 py-1 ${innerTab === "MY" ? "btn-primary" : "btn-outline-primary"}`}
+                  onClick={() => setInnerTab("MY")}
+                >
+                  MY
+                </button>
+                <button
+                  className={`btn p-2 py-1 ${innerTab === "Linked" ? "btn-primary" : "btn-outline-primary"}`}
+                  onClick={() => setInnerTab("Linked")}
+                >
+                  Linked
+                </button>
+              </div>
+            )}
             <div className="relation-card-wrap">
-              {/* Add Children Card */}
-              <div className="group-card-wrapper pt-4 pb-4 mb-3 text-center d-flex align-items-center justify-content-center">
-                <div className="group-card">
-                  <div className="image-wrapper">
-                    <div className="group-description-wrap cursor-pointer" onClick={handleOpen}>
-                      <MdAddCircle className="text-primary add-relation-icon" />
-                      <p className="mb-0 fw-500 text-primary">Add Children</p>
+              {/* Add Children Card - only for PARENT role */}
+              {isParent && (
+                <div className="group-card-wrapper pt-4 pb-4 mb-3 text-center d-flex align-items-center justify-content-center">
+                  <div className="group-card">
+                    <div className="image-wrapper">
+                      <div className="group-description-wrap cursor-pointer" onClick={handleOpen}>
+                        <MdAddCircle className="text-primary add-relation-icon" />
+                        <p className="mb-0 fw-500 text-primary">Add Children</p>
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
+              )}
               {/* Children Cards */}
               {innerTab === "MY" ? (
                 // MY tab - show primary children directly
@@ -810,22 +835,32 @@ console.log('myChildrenArr', myParentArr)
           </>
         )}
 
-        {activeTab === "Requests" && (
+        {activeTab === "Request" && (
           <>
-            <div className="mb-3 d-flex gap-3">
-              <button
-                className={`btn p-2 py-1 ${activeRequestTab === "Received" ? "btn-primary" : "btn-outline-primary"}`}
-                onClick={() => setActiveRequestTab("Received")}
-              >
-                Received
-              </button>
-              <button
-                className={`btn p-2 py-1 ${activeRequestTab === "Sent" ? "btn-primary" : "btn-outline-primary"}`}
-                onClick={() => setActiveRequestTab("Sent")}
-              >
-                Sent
-              </button>
-            </div>
+            {/* Show inner tabs only for PARENT role */}
+            {isParent ? (
+              <div className="mb-3 d-flex gap-3">
+                <button
+                  className={`btn p-2 py-1 ${activeRequestTab === "Received" ? "btn-primary" : "btn-outline-primary"}`}
+                  onClick={() => setActiveRequestTab("Received")}
+                >
+                  Received
+                </button>
+                <button
+                  className={`btn p-2 py-1 ${activeRequestTab === "Sent" ? "btn-primary" : "btn-outline-primary"}`}
+                  onClick={() => setActiveRequestTab("Sent")}
+                >
+                  Sent
+                </button>
+              </div>
+            ) : (
+              // For non-parent roles, force "Received" tab and show info
+              <div className="mb-3">
+                <p className="text-muted mb-0" style={{ fontSize: '14px' }}>
+                  You can only view received requests.
+                </p>
+              </div>
+            )}
             <div className="relation-card-wrap">
               {isLoadingRequests ? (
                 <div className="text-center py-4">

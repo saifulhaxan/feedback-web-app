@@ -39,6 +39,7 @@ import { PiCodesandboxLogo } from "react-icons/pi";
 import { MdEdit } from "react-icons/md";
 import Fetcher from "../library/Fetcher";
 import { ROLES } from "../utils/rolePermissions";
+import { handleInputChangeWithValidation } from "../utils/inputUtils";
 
 const style = {
   position: "absolute",
@@ -946,28 +947,28 @@ function ProjectPage() {
                 <div className="d-flex flex-column-responsive">
                   {/* Project Name */}
                   <div className="form-group mb-3 w-50 pe-md-3">
-                    <label className="auth-label">Project Name*</label>
+                    <label className="auth-label">Project Name</label>
                     <div className="authInputWrap d-flex align-items-center ps-3">
                       <input
                         type="text"
                         className="form-control auth-input"
                         placeholder="Type here"
                         value={projectName}
-                        onChange={(e) => setProjectName(e.target.value)}
+                        onChange={(e) => handleInputChangeWithValidation(e, setProjectName, setFormErrors, 'projectName')}
                       />
                     </div>
                   </div>
 
                   {/* Problem Name */}
                   <div className="form-group mb-3 w-50 ps-md-3">
-                    <label className="auth-label">Problem Name*</label>
+                    <label className="auth-label">Problem Name</label>
                     <div className="authInputWrap d-flex align-items-center ps-3">
                       <input
                         type="text"
                         className="form-control auth-input"
                         placeholder="Type here"
                         value={problemName}
-                        onChange={(e) => setProblemName(e.target.value)}
+                        onChange={(e) => handleInputChangeWithValidation(e, setProblemName, setFormErrors, 'problemName')}
                       />
                     </div>
                   </div>
@@ -976,14 +977,14 @@ function ProjectPage() {
                 <div className="d-flex flex-column-responsive">
                   {/* Solution Name */}
                   <div className="form-group mb-3 w-50 pe-md-3">
-                    <label className="auth-label">Solution Name*</label>
+                    <label className="auth-label">Solution Name</label>
                     <div className="authInputWrap d-flex align-items-center ps-3">
                       <input
                         type="text"
                         className="form-control auth-input"
                         placeholder="Type here"
                         value={solutionName}
-                        onChange={(e) => setSolutionName(e.target.value)}
+                        onChange={(e) => handleInputChangeWithValidation(e, setSolutionName, setFormErrors, 'solutionName')}
                       />
                     </div>
                   </div>
@@ -997,7 +998,7 @@ function ProjectPage() {
                         className="form-control auth-input"
                         placeholder="Type here"
                         value={solutionFunctionName}
-                        onChange={(e) => setSolutionFunctionName(e.target.value)}
+                        onChange={(e) => handleInputChangeWithValidation(e, setSolutionFunctionName, setFormErrors, 'solutionFunctionName')}
                       />
                     </div>
                   </div>
@@ -1031,7 +1032,7 @@ function ProjectPage() {
 
                 {/* Number of Steps */}
                 <div className="form-group mb-3 w-100">
-                  <label className="auth-label">Number of Steps*</label>
+                  <label className="auth-label">Number of Steps</label>
                   <div className="authInputWrap d-flex align-items-center ps-3">
                     <input
                       type="number"

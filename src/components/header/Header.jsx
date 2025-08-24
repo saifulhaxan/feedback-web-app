@@ -244,7 +244,9 @@ function Header() {
                 <li className="d-flex align-items-center drawer-list-li">
                   <Link to="/manage-relation">
                     <PiUsersThreeLight className="me-2" />
-                    {userRole === 'CHILD' ? 'My Parents' : 'My Children'}
+                    {userRole === 'CHILD' ? 'My Parents' : 
+                     userRole === 'PARENT' ? 'Parents & Children' : 
+                     'Children'}
                   </Link>
                 </li>
 

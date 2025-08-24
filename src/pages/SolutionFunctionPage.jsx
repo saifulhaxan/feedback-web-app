@@ -62,7 +62,7 @@ export default function SolutionFunctionPage() {
       <div className="mt-5">
         <div className="d-flex justify-content-between align-items-center mb-4 px-4">
           <h3 className="text-center fw-bold mb-0">
-            {projectData?.projectName || "Project"} Function Status
+            {projectData?.solutionFunctionName || projectData?.projectName || "Project"} Function Status
           </h3>
           <div className="d-flex gap-2">
             <Button 

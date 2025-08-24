@@ -119,10 +119,10 @@ function NetworkPage() {
   // Role-based tab filtering
   const availableTabs = useMemo(() => {
     if (isChild) {
-      // Children can only see connections and suggestions
-      return ["connections", "suggestions"];
+      // Children can only see connections (parents only)
+      return ["connections"];
     }
-    // Parents can see all tabs
+    // Other roles can see all tabs
     return ["connections", "suggestions", "requests"];
   }, [isChild]);
 
@@ -567,10 +567,12 @@ function NetworkPage() {
                 </div>
               )}
 
-              {/* Add Connection fixed to top-right */}
-              <button className="btn btn-primary connection-request" onClick={handleOpen}>
-                Add Connection
-              </button>
+              {/* Add Connection fixed to top-right - hidden for CHILD role */}
+              {!isChild && (
+                <button className="btn btn-primary connection-request" onClick={handleOpen}>
+                  Add Connection
+                </button>
+              )}
             </div>
 
             {activeTab == "connections" && (

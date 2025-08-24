@@ -199,9 +199,9 @@ function CreateProfilePage() {
 
               {/* Title */}
               <div className="form-group mb-3">
-                <label htmlFor="title" className="auth-label">
-                  Title *
-                </label>
+                                  <label htmlFor="title" className="auth-label">
+                    Title
+                  </label>
                 <div className="authInputWrap d-flex align-items-center">
                   <input
                     type="text"
@@ -218,9 +218,9 @@ function CreateProfilePage() {
 
               {/* Expertise */}
               <div className="form-group mb-3">
-                <label htmlFor="expertise" className="auth-label">
-                  Expertise *
-                </label>
+                                  <label htmlFor="expertise" className="auth-label">
+                    Expertise
+                  </label>
                 <div className="authInputWrap d-flex align-items-center">
                   <input
                     type="text"
@@ -237,9 +237,9 @@ function CreateProfilePage() {
 
               {/* Role Selection */}
               <div className="form-group mb-3">
-                <label htmlFor="roleId" className="auth-label">
-                  Role *
-                </label>
+                                  <label htmlFor="roleId" className="auth-label">
+                    Role
+                  </label>
                 <div className="authInputWrap d-flex align-items-center">
                   <select
                     className={`form-select auth-input ${formErrors.roleId ? 'is-invalid' : ''}`}
