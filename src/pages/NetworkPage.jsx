@@ -299,8 +299,15 @@ function NetworkPage() {
     // Refresh data based on the action type
     switch (actionType) {
       case "connection_request_sent":
-        // When a connection request is sent, refresh suggestions
+        // When a connection request is sent, refresh ALL tabs
+        // This ensures the user appears in sent requests and is removed from suggestions
+        setRequestsPagination({ skip: 0, take: 20, hasMore: true });
+        setSentRequestsPagination({ skip: 0, take: 20, hasMore: true });
+        setConnectionsPagination({ skip: 0, take: 20, hasMore: true });
         setSuggestionsPagination({ skip: 0, take: 20, hasMore: true });
+        fetchRequests();
+        fetchSentRequests();
+        fetchConnections();
         fetchSuggestions();
         break;
       case "connection_accepted":
@@ -413,8 +420,16 @@ function NetworkPage() {
 
   const handleConnectResponse = (response) => {
     console.log("📬 Response received from child Suggestion:", response);
-    // When a connection request is sent from suggestions, refresh suggestions
-    handleApiResponse(response, "connection_request_sent");
+    // When a connection request is sent from suggestions, refresh ALL tabs
+    // This ensures the user appears in sent requests and is removed from suggestions
+    setRequestsPagination({ skip: 0, take: 20, hasMore: true });
+    setSentRequestsPagination({ skip: 0, take: 20, hasMore: true });
+    setConnectionsPagination({ skip: 0, take: 20, hasMore: true });
+    setSuggestionsPagination({ skip: 0, take: 20, hasMore: true });
+    fetchRequests();
+    fetchSentRequests();
+    fetchConnections();
+    fetchSuggestions();
   };
 
   // Infinite scroll handler
@@ -562,11 +577,19 @@ function NetworkPage() {
               <div className="row">
                 {filteredConnections.map((item, index) => (
                   <div className={gridView ? "col-lg-3" : "col-lg-12 mb-3"} key={index}>
-                    <NetworkConnectionsCardGrid 
-                      item={item} 
-                      onApiResponse={(response, actionType) => handleApiResponse(response, actionType)}
-                      onProfileClick={handleUserProfileOpen}
-                    />
+                    {gridView ? (
+                      <NetworkConnectionsCardGrid 
+                        item={item} 
+                        onApiResponse={(response, actionType) => handleApiResponse(response, actionType)}
+                        onProfileClick={handleUserProfileOpen}
+                      />
+                    ) : (
+                      <NetworkConnectionsCardList 
+                        item={item} 
+                        onApiResponse={(response, actionType) => handleApiResponse(response, actionType)}
+                        onProfileClick={handleUserProfileOpen}
+                      />
+                    )}
                   </div>
                 ))}
                 {isLoadingMore && connectionsPagination.hasMore && (
@@ -783,7 +806,8 @@ function NetworkPage() {
       <UserProfileModal 
         open={userProfileModal.open} 
         onClose={handleUserProfileClose} 
-        userId={userProfileModal.userId} 
+        userId={userProfileModal.userId}
+        onApiResponse={(response, actionType) => handleApiResponse(response, actionType)}
       />
     </>
   );

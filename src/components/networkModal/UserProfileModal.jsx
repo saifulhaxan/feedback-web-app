@@ -4,7 +4,8 @@ import Box from "@mui/material/Box";
 import CircularProgress from "@mui/material/CircularProgress";
 import { IoIosClose } from "react-icons/io";
 import { FaLinkedin, FaTwitter, FaGlobe } from "react-icons/fa";
-import { getUserProfile } from "../../api/networkApi";
+import { getUserProfile, sendConnectionRequest, respondToConnectionRequest, deleteConnection } from "../../api/networkApi";
+import useUserStore from "../../store/userStore";
 import { toast } from "react-toastify";
 
 const style = {
@@ -22,9 +23,13 @@ const style = {
   overflow: "hidden",
 };
 
-const UserProfileModal = ({ open, onClose, userId }) => {
+const UserProfileModal = ({ open, onClose, userId, onApiResponse }) => {
   const [userData, setUserData] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [connectionStatus, setConnectionStatus] = useState(null); // 'connected', 'requested', 'received', 'not_connected'
+  const [loadingAction, setLoadingAction] = useState(false);
+
+  const { userData: currentUser } = useUserStore();
 
   useEffect(() => {
     if (open && userId) {
@@ -36,7 +41,19 @@ const UserProfileModal = ({ open, onClose, userId }) => {
     setLoading(true);
     try {
       const response = await getUserProfile(userId);
-      setUserData(response?.data?.data);
+      const profileData = response?.data?.data;
+      setUserData(profileData);
+      
+      // Determine connection status from profile data
+      if (profileData?.isConnected) {
+        setConnectionStatus('connected');
+      } else if (profileData?.requestSent) {
+        setConnectionStatus('requested');
+      } else if (profileData?.requestReceived) {
+        setConnectionStatus('received');
+      } else {
+        setConnectionStatus('not_connected');
+      }
     } catch (error) {
       console.error("Failed to fetch user profile:", error);
       toast.error("Failed to load user profile");
@@ -60,6 +77,138 @@ const UserProfileModal = ({ open, onClose, userId }) => {
       month: "long",
       day: "numeric",
     });
+  };
+
+  const handleConnect = async () => {
+    if (!currentUser?.user?.id || !userId) return;
+    
+    setLoadingAction(true);
+    try {
+      const response = await sendConnectionRequest({
+        requesterId: currentUser.user.id,
+        receiverId: userId,
+        connectAs: "Friend" // Default connection type
+      });
+      toast.success("Connection request sent successfully!");
+      setConnectionStatus('requested');
+      
+      // Trigger parent data refresh
+      if (onApiResponse) {
+        onApiResponse(response, "connection_request_sent");
+      }
+    } catch (error) {
+      toast.error(error?.response?.data?.message || "Failed to send connection request");
+    } finally {
+      setLoadingAction(false);
+    }
+  };
+
+  const handleAcceptRequest = async () => {
+    if (!userData?.connectionRequestId) return;
+    
+    setLoadingAction(true);
+    try {
+      const response = await respondToConnectionRequest(userData.connectionRequestId, "accept");
+      toast.success("Connection request accepted!");
+      setConnectionStatus('connected');
+      
+      // Trigger parent data refresh
+      if (onApiResponse) {
+        onApiResponse(response, "connection_accepted");
+      }
+    } catch (error) {
+      toast.error(error?.response?.data?.message || "Failed to accept request");
+    } finally {
+      setLoadingAction(false);
+    }
+  };
+
+  const handleDeclineRequest = async () => {
+    if (!userData?.connectionRequestId) return;
+    
+    setLoadingAction(true);
+    try {
+      const response = await respondToConnectionRequest(userData.connectionRequestId, "reject");
+      toast.success("Connection request declined");
+      setConnectionStatus('not_connected');
+      
+      // Trigger parent data refresh
+      if (onApiResponse) {
+        onApiResponse(response, "connection_rejected");
+      }
+    } catch (error) {
+      toast.error(error?.response?.data?.message || "Failed to decline request");
+    } finally {
+      setLoadingAction(false);
+    }
+  };
+
+  const handleDisconnect = async () => {
+    if (!userData?.connectionId) return;
+    
+    setLoadingAction(true);
+    try {
+      const response = await deleteConnection(userData.connectionId);
+      toast.success("Connection removed successfully");
+      setConnectionStatus('not_connected');
+      
+      // Trigger parent data refresh
+      if (onApiResponse) {
+        onApiResponse(response, "connection_deleted");
+      }
+    } catch (error) {
+      toast.error(error?.response?.data?.message || "Failed to remove connection");
+    } finally {
+      setLoadingAction(false);
+    }
+  };
+
+  const renderConnectionButton = () => {
+    if (loadingAction) {
+      return (
+        <div className="text-center">
+          <CircularProgress size={20} />
+        </div>
+      );
+    }
+
+    switch (connectionStatus) {
+      case 'connected':
+        return (
+          <div className="d-flex gap-2">
+            <button className="btn btn-success" disabled>
+              Connected
+            </button>
+            <button className="btn btn-outline-danger" onClick={handleDisconnect}>
+              Disconnect
+            </button>
+          </div>
+        );
+      case 'requested':
+        return (
+          <button className="btn btn-warning" disabled>
+            Request Sent
+          </button>
+        );
+      case 'received':
+        return (
+          <div className="d-flex gap-2">
+            <button className="btn btn-success" onClick={handleAcceptRequest}>
+              Accept
+            </button>
+            <button className="btn btn-outline-secondary" onClick={handleDeclineRequest}>
+              Decline
+            </button>
+          </div>
+        );
+      case 'not_connected':
+      default:
+        return (
+          <button className="btn btn-primary" onClick={handleConnect}>
+            Connect
+          </button>
+        );
+    }
   };
 
   return (
@@ -110,7 +259,6 @@ const UserProfileModal = ({ open, onClose, userId }) => {
                 <h4 className="mb-1">
                   {userData.firstname} {userData.lastname}
                 </h4>
-                <p className="text-muted mb-2">{userData.email}</p>
                 {userData.role && (
                   <span className="badge bg-primary me-2">{userData.role.name}</span>
                 )}
@@ -119,18 +267,19 @@ const UserProfileModal = ({ open, onClose, userId }) => {
                 )}
               </div>
 
-              {/* Contact Information */}
+              {/* Connection Action Button */}
+              <div className="text-center mb-4">
+                {renderConnectionButton()}
+              </div>
+
+              {/* Basic Information */}
               <div className="mb-4">
-                <h5 className="mb-3">Contact Information</h5>
+                <h5 className="mb-3">Basic Information</h5>
                 <div className="row">
-                  <div className="col-md-6 mb-3">
-                    <strong>Email:</strong>
-                    <p className="text-muted mb-0">{userData.email}</p>
-                  </div>
-                  {userData.phone && (
+                  {userData.title && (
                     <div className="col-md-6 mb-3">
-                      <strong>Phone:</strong>
-                      <p className="text-muted mb-0">{userData.phone}</p>
+                      <strong>Title:</strong>
+                      <p className="text-muted mb-0">{userData.title}</p>
                     </div>
                   )}
                   {userData.location && (

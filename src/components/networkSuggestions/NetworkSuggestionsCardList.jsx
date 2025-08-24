@@ -1,5 +1,4 @@
 import React, { useState } from "react";
-import NetworkProfile from "../../assets/images/network-profile.png";
 import { GoDotFill } from "react-icons/go";
 import { useNavigate } from "react-router-dom";
 import { sendConnectionRequest } from "../../api/networkApi";
@@ -8,7 +7,7 @@ import useTokenStore from "../../store/userToken";
 import { toast } from "react-toastify";
 
 function NetworkSuggestionsCardList(props) {
-  const { firstname, lastname, title, expertise, feedbackProvided, feedbackSolved, id } =
+  const { firstname, lastname, title, expertise, feedbackProvided, feedbackSolved, id, image } =
     props.item.users[0];
   const { onProfileClick, onConnectResponse } = props;
 
@@ -49,6 +48,8 @@ function NetworkSuggestionsCardList(props) {
     connectAs: connectType
   })
 
+  const initials = `${firstname?.charAt(0) || ""}${lastname?.charAt(0) || ""}`.toUpperCase();
+
   const handleConnect = async () => {
     try {
       const response = await sendConnectionRequest(connetData);
@@ -74,12 +75,29 @@ function NetworkSuggestionsCardList(props) {
     <div className="connection-card-wrapper d-flex justify-content-between align-items-center">
       <div className="d-flex align-items-center">
         <div className="connection-card-img me-3">
-          <img 
-            src={NetworkProfile} 
-            alt="" 
-            style={{ cursor: "pointer" }}
-            onClick={() => onProfileClick?.(id)}
-          />
+          {image ? (
+            <img
+              src={image?.startsWith("http") ? image : `https://feedbackwork.net/feedbackapi/${image}`}
+              alt={`${firstname} ${lastname}`}
+              className="rounded-circle"
+              style={{ width: 60, height: 60, objectFit: "cover", cursor: "pointer" }}
+              onClick={() => onProfileClick?.(id)}
+            />
+          ) : (
+            <div
+              className="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center"
+              style={{
+                width: 60,
+                height: 60,
+                fontSize: "1.2rem",
+                fontWeight: "bold",
+                cursor: "pointer",
+              }}
+              onClick={() => onProfileClick?.(id)}
+            >
+              {initials}
+            </div>
+          )}
         </div>
 
         <div>

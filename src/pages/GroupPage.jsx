@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useMemo } from "react";
+import { useLocation } from "react-router-dom";
 import { Box, Button } from "@mui/material";
 import { FaList } from "react-icons/fa";
 import { FiGrid } from "react-icons/fi";
@@ -18,7 +19,8 @@ import User6 from "../assets/images/user6.png";
 import { FaCheck } from "react-icons/fa";
 import { FaLock, FaGlobe } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
-import GroupModal from "../components/groupModal/GroupModal";
+import NormalGroupModal from "../components/groupModal/NormalGroupModal";
+import MonitoringGroupModal from "../components/groupModal/MonitoringGroupModal";
 import Fetcher from "../library/Fetcher";
 import { toast } from "react-toastify";
 import { getAllGroups, searchPublicGroups, joinPublicGroup, respondToGroupInvitation } from "../api/groupsApi";
@@ -41,6 +43,7 @@ const style = {
 };
 
 export default function GroupPage() {
+  const location = useLocation();
   // Get current user data and role for role-based restrictions
   const { userData } = useUserStore();
   const currentUserRole = userData?.user?.role?.name;
@@ -53,9 +56,12 @@ export default function GroupPage() {
   const [listView, setListView] = useState(false);
   const [activeTab, setActiveTab] = useState("My Groups");
   const [activeSubTab, setActiveSubTab] = useState("Joined");
-  const [open, setOpen] = React.useState(false);
-  const handleOpen = () => setOpen(true);
-  const handleClose = () => setOpen(false);
+  const [openNormalModal, setOpenNormalModal] = React.useState(false);
+  const [openMonitoringModal, setOpenMonitoringModal] = React.useState(false);
+  const handleOpenNormalModal = () => setOpenNormalModal(true);
+  const handleCloseNormalModal = () => setOpenNormalModal(false);
+  const handleOpenMonitoringModal = () => setOpenMonitoringModal(true);
+  const handleCloseMonitoringModal = () => setOpenMonitoringModal(false);
   
   // Callback to refresh groups data after successful creation
   const handleGroupCreated = () => {
@@ -230,9 +236,17 @@ const navigate = useNavigate();
 
 
   useEffect(() => {
+    // Check URL parameters for tab selection
+    const urlParams = new URLSearchParams(location.search);
+    const tabParam = urlParams.get('tab');
+    
+    if (tabParam === 'monitoring') {
+      setActiveTab("Monitor Groups");
+    }
+    
     fetchGroups("normal")
     fetchPendingGroups()
-  }, [])
+  }, [location.search])
 
   // Refresh data when active tab changes
   useEffect(() => {
@@ -373,8 +387,13 @@ const navigate = useNavigate();
                 )}
               </div>
 
-              {canCreateMonitoringGroup && (
-                <div className="add-groups bg-primary cursor-pointer" onClick={handleOpen}>
+              {activeTab === "My Groups" && (
+                <div className="add-groups bg-primary cursor-pointer" onClick={handleOpenNormalModal}>
+                  <MdAdd className="filter-icon-btn text-white" />
+                </div>
+              )}
+              {activeTab === "Monitor Groups" && canCreateMonitoringGroup && (
+                <div className="add-groups bg-primary cursor-pointer" onClick={handleOpenMonitoringModal}>
                   <MdAdd className="filter-icon-btn text-white" />
                 </div>
               )}
@@ -471,7 +490,8 @@ const navigate = useNavigate();
                               src={`https://feedbackwork.net/feedbackapi/${card.imageUrl}`} 
                               alt="" 
                               className="rounded-circle"
-                              style={{ width: 60, height: 60, objectFit: "cover", margin: "0 auto" }}
+                              style={{ width: 60, height: 60, objectFit: "cover", margin: "0 auto", cursor: "pointer" }}
+                              onClick={() => navigate(`/groups/${card.id}`)}
                               onError={(e) => {
                                 e.target.style.display = 'none';
                                 e.target.nextSibling.style.display = 'flex';
@@ -484,8 +504,10 @@ const navigate = useNavigate();
                                 width: 60, 
                                 height: 60, 
                                 backgroundColor: '#007bff',
-                                margin: "0 auto"
+                                margin: "0 auto",
+                                cursor: "pointer"
                               }}
+                              onClick={() => navigate(`/groups/${card.id}`)}
                             >
                               {getGroupInitials(card.name)}
                             </div>
@@ -505,9 +527,11 @@ const navigate = useNavigate();
                         </div>
                       </div>
                       <div className={`group-card-btn ${gridView ? "mt-3" : ""}`}>
-                        <button className="btn btn-link text-primary" onClick={() => navigate(`/groups/${card.id}`)}>
-                          Manage
-                        </button>
+                        {card.createdById === userData?.user?.id && (
+                          <button className="btn btn-link text-primary" onClick={() => navigate(`/groups/${card.id}`)}>
+                            Manage
+                          </button>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -574,7 +598,8 @@ const navigate = useNavigate();
         )}
       </div>
 
-      <GroupModal open={open} onClose={handleClose} onGroupCreated={handleGroupCreated} />
+      <NormalGroupModal open={openNormalModal} onClose={handleCloseNormalModal} onGroupCreated={handleGroupCreated} />
+      <MonitoringGroupModal open={openMonitoringModal} onClose={handleCloseMonitoringModal} onGroupCreated={handleGroupCreated} />
     </section>
   );
 }

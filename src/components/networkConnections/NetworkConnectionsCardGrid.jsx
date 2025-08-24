@@ -1,17 +1,37 @@
 import React from "react";
-import NetworkProfile from "../../assets/images/network-profile.png";
 import { GoDotFill } from "react-icons/go";
 import { useNavigate } from "react-router-dom";
+import { deleteConnection } from "../../api/networkApi";
+import { toast } from "react-toastify";
 
 function NetworkConnectionsCardGrid(props) {
   const navigate = useNavigate();
-  const { item, onProfileClick } = props;
+  const { item, onProfileClick, onApiResponse } = props;
   const sentBy = item || {};
 
-  const initials = `${sentBy?.firstname?.charAt(0) || ""}${sentBy?.lastname?.charAt(0) || ""}`.toUpperCase();
+  const initials = `${sentBy?.user?.firstname?.charAt(0) || ""}${sentBy?.user?.lastname?.charAt(0) || ""}`.toUpperCase();
 
   const handleRequestFeedback = () => {
     navigate("/request-feedback");
+  };
+
+  const handleDisconnect = async () => {
+    if (!item?.id) {
+      toast.error("Connection ID not found");
+      return;
+    }
+
+    try {
+      await deleteConnection(item.id);
+      toast.success("Connection removed successfully");
+      
+      // Trigger parent data refresh
+      if (onApiResponse) {
+        onApiResponse({ success: true }, "connection_deleted");
+      }
+    } catch (error) {
+      toast.error(error?.response?.data?.message || "Failed to remove connection");
+    }
   };
 
   return (
@@ -20,7 +40,7 @@ function NetworkConnectionsCardGrid(props) {
         {sentBy?.user?.image ? (
           <img
             src={sentBy?.user?.image?.startsWith("http") ? sentBy?.user?.image : `https://feedbackwork.net/feedbackapi/${sentBy?.user?.image}`}
-            alt={`${sentBy.firstname} ${sentBy.lastname}`}
+            alt={`${sentBy?.user?.firstname} ${sentBy?.user?.lastname}`}
             className="rounded-circle"
             style={{ width: 60, height: 60, objectFit: "cover", margin: "0 auto", cursor: "pointer" }}
             onClick={() => onProfileClick?.(sentBy?.user?.id)}
@@ -68,11 +88,12 @@ function NetworkConnectionsCardGrid(props) {
       </div>
 
       <div className="connection-card-btns">
-        <button className="btn btn-primary connection-request" onClick={handleRequestFeedback}>
+        <button className="btn btn-primary connection-request mb-2" onClick={handleRequestFeedback}>
           Request Feedback
         </button>
-        {/* <button className="btn connection-connect-as mb-2">Connect As</button>
-        <button className="btn btn-outline-secondary">Decline</button> */}
+        <button className="btn btn-outline-danger" onClick={handleDisconnect}>
+          Disconnect
+        </button>
       </div>
     </div>
   );

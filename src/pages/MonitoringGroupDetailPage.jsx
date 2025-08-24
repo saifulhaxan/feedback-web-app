@@ -98,11 +98,11 @@ export default function MonitoringGroupDetailPage() {
                     {/* Header */}
                     <div className="d-flex align-items-center mb-4">
                         <Button
-                            onClick={() => navigate('/groups')}
+                            onClick={() => navigate('/groups?tab=monitoring')}
                             startIcon={<MdArrowBack />}
                             sx={{ textTransform: "none", color: "#666" }}
                         >
-                            Back to Groups
+                            Back to Monitoring Groups
                         </Button>
                     </div>
 
@@ -169,9 +169,6 @@ export default function MonitoringGroupDetailPage() {
                     <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
                         <Tabs value={activeTab} onChange={(e, newValue) => setActiveTab(newValue)}>
                             <Tab label="Overview" />
-                            <Tab label="Progress Dashboard" />
-                            <Tab label="Projects" />
-                            <Tab label="Members" />
                         </Tabs>
                     </Box>
 

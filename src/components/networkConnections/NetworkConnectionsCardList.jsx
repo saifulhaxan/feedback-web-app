@@ -1,16 +1,37 @@
 import React from "react";
 import { GoDotFill } from "react-icons/go";
 import { useNavigate } from "react-router-dom";
+import { deleteConnection } from "../../api/networkApi";
+import { toast } from "react-toastify";
 
 function NetworkConnectionsCardList(props) {
   const navigate = useNavigate();
-  const { item } = props;
-  const sentBy = item?.sentBy || {};
+  const { item, onApiResponse } = props;
+  const sentBy = item?.user || item?.sentBy || {};
 
   const initials = `${sentBy?.firstname?.charAt(0) || ""}${sentBy?.lastname?.charAt(0) || ""}`.toUpperCase();
 
   const handleRequestFeedback = () => {
     navigate("/request-feedback");
+  };
+
+  const handleDisconnect = async () => {
+    if (!item?.id) {
+      toast.error("Connection ID not found");
+      return;
+    }
+
+    try {
+      await deleteConnection(item.id);
+      toast.success("Connection removed successfully");
+      
+      // Trigger parent data refresh
+      if (onApiResponse) {
+        onApiResponse({ success: true }, "connection_deleted");
+      }
+    } catch (error) {
+      toast.error(error?.response?.data?.message || "Failed to remove connection");
+    }
   };
 
   return (
@@ -19,7 +40,7 @@ function NetworkConnectionsCardList(props) {
         <div className="connection-card-img me-3">
           {sentBy?.image ? (
             <img
-              src={sentBy?.image}
+              src={sentBy?.image?.startsWith("http") ? sentBy?.image : `https://feedbackwork.net/feedbackapi/${sentBy?.image}`}
               alt={`${sentBy?.firstname} ${sentBy?.lastname}`}
               className="rounded-circle"
               style={{ width: 60, height: 60, objectFit: "cover" }}
@@ -49,7 +70,7 @@ function NetworkConnectionsCardList(props) {
               <span className="me-1 connection-dot">
                 <GoDotFill />
               </span>
-              <span>{item?.subject || "Subject"}</span>
+              <span>{item?.subject || sentBy?.expertise || "Subject"}</span>
             </p>
           </div>
 
@@ -70,8 +91,9 @@ function NetworkConnectionsCardList(props) {
         <button className="btn btn-primary connection-request mb-2" onClick={handleRequestFeedback}>
           Request Feedback
         </button>
-        <button className="btn connection-connect-as mb-2">Connect As</button>
-        <button className="btn btn-outline-secondary">Decline</button>
+        <button className="btn btn-outline-danger" onClick={handleDisconnect}>
+          Disconnect
+        </button>
       </div>
     </div>
   );

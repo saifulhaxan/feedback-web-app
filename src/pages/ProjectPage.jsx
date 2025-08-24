@@ -101,6 +101,7 @@ function ProjectPage() {
   const [youtubeLink, setYoutubeLink] = useState("");
   const [modalTab, setModalTab] = useState(1);
   const [projectData, setProjectData] = useState();
+  const [numberOfSteps, setNumberOfSteps] = useState(""); // New field for number of steps
 
   // Step 2 states
   const [startDate, setStartDate] = useState("");
@@ -110,6 +111,7 @@ function ProjectPage() {
   const [beepAtBreak, setBeepAtBreak] = useState(false);
   const [popupText, setPopupText] = useState("");
   const [stepsPerHour, setStepsPerHour] = useState(""); // empty string, not 1
+  const [estimatedHours, setEstimatedHours] = useState(""); // New state for estimated hours
   const [firstStepData, setFirstStepData] = useState("");
   const [status, setStatus] = useState("");
 
@@ -244,6 +246,29 @@ function ProjectPage() {
     }
   };
 
+  // Calculate estimated completion hours
+  const calculateEstimatedHours = (totalSteps, stepsPerHour) => {
+    if (totalSteps && stepsPerHour && stepsPerHour > 0) {
+      const hours = totalSteps / stepsPerHour;
+      return hours.toFixed(1);
+    }
+    return "";
+  };
+
+  // Format datetime to local timezone
+  const formatToLocalDateTime = (dateString) => {
+    if (!dateString) return "";
+    const date = new Date(dateString);
+    return date.toLocaleString('en-US', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true
+    });
+  };
+
   const resetFields = () => {
     setProjectName("");
     setProblemName("");
@@ -252,13 +277,14 @@ function ProjectPage() {
     setYoutubeLink("");
     setUploadedFile(null);
     setEditorState(EditorState.createEmpty());
+    setNumberOfSteps(""); // Reset new field
 
     setStartDate("");
     setFinishDate("");
     setBreakDate("");
-    setUploadedFile(null);
     setBeepAudio(null);
     setPopupText("");
+    setEstimatedHours(""); // Reset estimated hours
     setUseJsonFormat(false); // Reset format toggle
     setUseStepConfigJsonFormat(false); // Reset stepConfig format toggle
   };
@@ -345,6 +371,10 @@ function ProjectPage() {
       toast.error("Solution Name is required!");
       return; // ❗️ Stop here - Do NOT continue to API
     }
+    if (!numberOfSteps || numberOfSteps <= 0) {
+      toast.error("Number of Steps is required and must be greater than 0!");
+      return; // ❗️ Stop here - Do NOT continue to API
+    }
 
     // Check if we have a file upload or want to use JSON format
     if (uploadedFile || !useJsonFormat) {
@@ -360,6 +390,7 @@ function ProjectPage() {
     if (uploadedFile) {
       formData.append("imageUrl", uploadedFile);
     }
+    formData.append("numberOfSteps", numberOfSteps); // Append new field
 
     if (editMode) {
       // UPDATE PROJECT (STEP 1)
@@ -380,7 +411,8 @@ function ProjectPage() {
         solutionFunction: solutionFunctionName,
         description: draftToHtml(convertToRaw(editorState.getCurrentContent())),
         youtubeLink: youtubeLink,
-        status: "In Progress"
+        status: "In Progress",
+        numberOfSteps: numberOfSteps // Include new field in JSON
         // Note: userId is not included in JSON format as per your specification
       };
 
@@ -394,6 +426,7 @@ function ProjectPage() {
         formData.append("youtubeLink", youtubeLink);
         formData.append("userId", userId);
         formData.append("description", draftToHtml(convertToRaw(editorState.getCurrentContent())));
+        formData.append("numberOfSteps", numberOfSteps); // Append new field
 
         editProjectBasicMutation.mutate({
           id: editingProjectId,
@@ -431,6 +464,12 @@ function ProjectPage() {
   // Submit handler
   const handleSecondStepSubmit = (e) => {
     e.preventDefault();
+
+    // Validation for step config
+    if (!stepsPerHour || stepsPerHour <= 0) {
+      toast.error("Steps per Hour is required and must be greater than 0!");
+      return;
+    }
 
     const toISOString = (value) => {
       return value ? new Date(value).toISOString() : null;
@@ -571,6 +610,7 @@ function ProjectPage() {
     setSolutionFunctionName(projectData.solutionFunction || "");
     setYoutubeLink(projectData.youtubeLink || "");
     setStatus(projectData.status || "");
+    setNumberOfSteps(projectData.numberOfSteps || ""); // Prefill new field
 
     const contentState = ContentState.createFromBlockArray(convertFromHTML(projectData.description || ""));
     setEditorState(EditorState.createWithContent(contentState));
@@ -600,6 +640,17 @@ function ProjectPage() {
       setBreakDate(config.breakTime ? new Date(config.breakTime).toISOString().slice(0, 16) : "");
       setBeepAtBreak(config.beepAtBreakTime || false);
       setPopupText(config.popupText || "");
+      setStepsPerHour(config.stepsPerHour || "");
+
+      // Calculate estimated hours for existing project
+      if (config.stepsPerHour && numberOfSteps) {
+        const estimated = calculateEstimatedHours(numberOfSteps, config.stepsPerHour);
+        setEstimatedHours(estimated);
+      } else if (config.stepsPerHour && projectData.numberOfSteps) {
+        // Use project's numberOfSteps if available
+        const estimated = calculateEstimatedHours(projectData.numberOfSteps, config.stepsPerHour);
+        setEstimatedHours(estimated);
+      }
 
       if (config.beepAudio) {
         try {
@@ -618,6 +669,8 @@ function ProjectPage() {
       setBreakDate("");
       setBeepAtBreak(false);
       setPopupText("");
+      setStepsPerHour("");
+      setEstimatedHours("");
       setBeepAudio(null);
     }
 
@@ -976,6 +1029,40 @@ function ProjectPage() {
                   />
                 </div>
 
+                {/* Number of Steps */}
+                <div className="form-group mb-3 w-100">
+                  <label className="auth-label">Number of Steps*</label>
+                  <div className="authInputWrap d-flex align-items-center ps-3">
+                    <input
+                      type="number"
+                      className="form-control auth-input"
+                      min={1}
+                      max={1000}
+                      placeholder="Enter total number of steps"
+                      value={numberOfSteps}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        // Allow empty string for clearing
+                        if (val === "") {
+                          setNumberOfSteps("");
+                          setEstimatedHours("");
+                          return;
+                        }
+                        // Only allow numbers between 1 and 1000
+                        const num = Number(val);
+                        if (num >= 1 && num <= 1000) {
+                          setNumberOfSteps(num);
+                          // Calculate estimated hours if steps per hour is also set
+                          if (stepsPerHour) {
+                            const estimated = calculateEstimatedHours(num, stepsPerHour);
+                            setEstimatedHours(estimated);
+                          }
+                        }
+                      }}
+                    />
+                  </div>
+                </div>
+
                 {/* Upload Image */}
                 <div className="form-group mb-3 w-100">
                   <div className="w-100">
@@ -1043,6 +1130,7 @@ function ProjectPage() {
                     />
                   </div>
                 </div>
+
 
 
 
@@ -1124,9 +1212,9 @@ function ProjectPage() {
                   <label className="auth-label mb-0">Beep at Break Time</label>
                 </div>
 
-                {/* Number of Steps */}
+                {/* Steps per Hour */}
                 <div className="form-group mb-3 w-100">
-                  <label className="auth-label">Number of Steps (per hour)</label>
+                  <label className="auth-label">Steps per Hour</label>
                   <div className="authInputWrap d-flex align-items-center ps-3">
                     <input
                       type="number"
@@ -1140,17 +1228,58 @@ function ProjectPage() {
                         // Allow empty string for clearing
                         if (val === "") {
                           setStepsPerHour("");
+                          setEstimatedHours("");
                           return;
                         }
                         // Only allow numbers between 1 and 50
                         const num = Number(val);
                         if (num >= 1 && num <= 50) {
                           setStepsPerHour(num);
+                          // Calculate estimated hours
+                          const estimated = calculateEstimatedHours(numberOfSteps, num);
+                          setEstimatedHours(estimated);
                         }
                       }}
                     />
                   </div>
+                  {estimatedHours && (
+                    <div className="mt-2">
+                      <small className="text-muted">
+                        Estimated completion time: <strong>{estimatedHours} hours</strong> 
+                        {numberOfSteps && stepsPerHour && (
+                          <span> ({numberOfSteps} steps ÷ {stepsPerHour} steps/hour)</span>
+                        )}
+                      </small>
+                    </div>
+                  )}
                 </div>
+
+                {/* DateTime Information Display */}
+                {(startDate || finishDate) && (
+                  <div className="form-group mb-3 w-100">
+                    <label className="auth-label">Project Timeline (Local Time)</label>
+                    <div className="p-3 bg-light rounded">
+                      {startDate && (
+                        <div className="mb-2">
+                          <small className="text-muted">Start Date/Time:</small>
+                          <div className="fw-bold">{formatToLocalDateTime(startDate)}</div>
+                        </div>
+                      )}
+                      {finishDate && (
+                        <div className="mb-2">
+                          <small className="text-muted">End Date/Time:</small>
+                          <div className="fw-bold">{formatToLocalDateTime(finishDate)}</div>
+                        </div>
+                      )}
+                      {breakDate && (
+                        <div>
+                          <small className="text-muted">Break Date/Time:</small>
+                          <div className="fw-bold">{formatToLocalDateTime(breakDate)}</div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
 
                 {/* Popup Text */}
                 <div className="form-group mb-3 w-100">

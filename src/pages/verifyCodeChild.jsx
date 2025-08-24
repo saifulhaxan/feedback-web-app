@@ -111,7 +111,7 @@ function VerifyCodeChild() {
             const response = await Fetcher.post("/user/child/verify-email", otpData);
             console.log("✅ API Success:", response.data);
             toast.success(response.data?.data?.data?.message || "OTP Verified!");
-            navigate('/manage-relation')
+            navigate('/manage-relation?tab=children')
 
         } catch (error) {
             console.error("❌ API Error:", error);

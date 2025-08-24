@@ -11,10 +11,10 @@ import {
   getGroupById, 
   addMemberToGroup, 
   removeMemberFromGroup, 
-  updateGroup, 
   deleteGroup,
   leaveGroup 
 } from "../api/groupsApi";
+import NormalGroupModal from "../components/groupModal/NormalGroupModal";
 import { searchUsers } from "../api/networkApi";
 import useUserStore from "../store/userStore";
 
@@ -48,6 +48,7 @@ export default function GroupDetailPage() {
   const [loading, setLoading] = useState(true);
   const [openAddMember, setOpenAddMember] = useState(false);
   const [openEditGroup, setOpenEditGroup] = useState(false);
+  const [editGroupData, setEditGroupData] = useState(null);
   const [openDeleteConfirm, setOpenDeleteConfirm] = useState(false);
   
   // Form states for edit group
@@ -65,10 +66,12 @@ export default function GroupDetailPage() {
   // Mutations
   const getGroupMutation = useMutation(getGroupById, {
     onSuccess: (data) => {
-      setGroupData(data?.data?.data);
-      setEditGroupName(data?.data?.data?.name || "");
-      setEditGroupDescription(data?.data?.data?.description || "");
-      setEditIsPrivate(data?.data?.data?.isPrivate || false);
+      const groupData = data?.data?.data;
+      setGroupData(groupData);
+      setEditGroupName(groupData?.name || "");
+      setEditGroupDescription(groupData?.description || "");
+      setEditIsPrivate(groupData?.isPrivate || false);
+      setEditGroupData(groupData);
       setLoading(false);
     },
     onError: (error) => {
@@ -100,16 +103,7 @@ export default function GroupDetailPage() {
     },
   });
 
-  const updateGroupMutation = useMutation(updateGroup, {
-    onSuccess: (data) => {
-      toast.success(data?.data?.data?.message || "Group updated successfully!");
-      setOpenEditGroup(false);
-      getGroupMutation.mutate(groupId);
-    },
-    onError: (error) => {
-      toast.error(error?.response?.data?.message || "Failed to update group");
-    },
-  });
+
 
   const deleteGroupMutation = useMutation(deleteGroup, {
     onSuccess: (data) => {
@@ -189,15 +183,7 @@ export default function GroupDetailPage() {
     removeMemberMutation.mutate(removeData);
   };
 
-  const handleUpdateGroup = () => {
-    const updateData = {
-      name: editGroupName,
-      description: editGroupDescription,
-      isPrivate: editIsPrivate
-    };
 
-    updateGroupMutation.mutate(groupId, updateData);
-  };
 
   const handleDeleteGroup = () => {
     deleteGroupMutation.mutate(groupId);
@@ -300,9 +286,9 @@ export default function GroupDetailPage() {
               <div className="d-flex align-items-center mb-3">
                 {groupData.imageUrl ? (
                   <img 
-                    src={groupData.imageUrl} 
+                    src={`https://feedbackwork.net/feedbackapi/${groupData.imageUrl}`}
                     alt={groupData.name}
-                    style={{ width: "80px", height: "80px", borderRadius: "50%", marginRight: "16px" }}
+                    style={{ width: "80px", height: "80px", borderRadius: "50%", marginRight: "16px", objectFit: "cover" }}
                   />
                 ) : (
                   <Avatar 
@@ -386,7 +372,7 @@ export default function GroupDetailPage() {
                       
                       <div className="flex-grow-1">
                         <h6 className="mb-1">
-                          {member.user?.firstname} {member.user?.lastname}
+                          {member.userId === userData?.user?.id ? "You" : `${member.user?.firstname} ${member.user?.lastname}`}
                         </h6>
                         <small className="text-muted">{member.role}</small>
                       </div>
@@ -491,60 +477,16 @@ export default function GroupDetailPage() {
       </Modal>
 
       {/* Edit Group Modal */}
-      <Modal
-        open={openEditGroup}
-        onClose={() => setOpenEditGroup(false)}
-        aria-labelledby="edit-group-modal"
-      >
-        <Box sx={style}>
-          <h3 className="mb-4">Edit Group</h3>
-          
-          <div className="form-group mb-3">
-            <label className="auth-label">Group Name</label>
-            <input
-              type="text"
-              className="form-control auth-input"
-              value={editGroupName}
-              onChange={(e) => setEditGroupName(e.target.value)}
-            />
-          </div>
-
-          <div className="form-group mb-3">
-            <label className="auth-label">Description</label>
-            <textarea
-              className="form-control auth-input"
-              rows="3"
-              value={editGroupDescription}
-              onChange={(e) => setEditGroupDescription(e.target.value)}
-            />
-          </div>
-
-          <div className="form-group mb-3">
-            <div className="d-flex align-items-center">
-              <input
-                type="checkbox"
-                checked={editIsPrivate}
-                onChange={(e) => setEditIsPrivate(e.target.checked)}
-                className="me-2"
-              />
-              <label className="auth-label mb-0">Private Group</label>
-            </div>
-          </div>
-
-          <div className="d-flex justify-content-end gap-2">
-            <Button onClick={() => setOpenEditGroup(false)}>
-              Cancel
-            </Button>
-            <Button 
-              variant="contained"
-              onClick={handleUpdateGroup}
-              disabled={updateGroupMutation.isLoading}
-            >
-              {updateGroupMutation.isLoading ? <CircularProgress size={20} /> : "Update Group"}
-            </Button>
-          </div>
-        </Box>
-      </Modal>
+      <NormalGroupModal 
+        open={openEditGroup} 
+        onClose={() => setOpenEditGroup(false)} 
+        onGroupCreated={() => {
+          setOpenEditGroup(false);
+          getGroupMutation.mutate(groupId);
+        }}
+        editMode={true}
+        groupData={editGroupData}
+      />
 
       {/* Delete Confirmation Modal */}
       <Modal

@@ -38,7 +38,6 @@ const style = {
 
 const ProjectCard = ({ projectData, index, onEdit, onDeleted, userData, sharedWithUsers, sharedBy, hideActions = false }) => {
   const [isExpanded, setIsExpanded] = useState(false);
-  const [isProgressExpanded, setIsProgressExpanded] = useState(false);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [shareModalOpen, setShareModalOpen] = useState(false);
   const [userProfileModal, setUserProfileModal] = useState({ open: false, userId: null, userData: null });
@@ -49,7 +48,6 @@ const ProjectCard = ({ projectData, index, onEdit, onDeleted, userData, sharedWi
   const navigate = useNavigate();
 
   const toggleExpand = () => setIsExpanded(!isExpanded);
-  const toggleProgressExpand = () => setIsProgressExpanded(!isProgressExpanded);
 
   const handleShareClick = () => {
     setShareModalOpen(true);
@@ -95,7 +93,7 @@ const ProjectCard = ({ projectData, index, onEdit, onDeleted, userData, sharedWi
   const handleUserClick = async (userId) => {
     setLoading(true);
     setUserProfileModal({ open: true, userId, userData: null });
-    
+
     try {
       const response = await getUserProfile(userId);
       setUserProfileModal({ open: true, userId, userData: response?.data?.data });
@@ -167,6 +165,47 @@ const ProjectCard = ({ projectData, index, onEdit, onDeleted, userData, sharedWi
     return pattern.test(url);
   };
 
+  // Helper function to get project status with correct priority
+  const getProjectStatus = () => {
+    const project = projectData?.project || projectData;
+    
+    if (project?.isExpired) return "Expired";
+    if (project?.isCompleted) return "Completed";
+    if (project?.isStarted) return "Started";
+    return "Start";
+  };
+
+  // Helper function to check if project is started
+  const isProjectStarted = () => {
+    return projectData?.isStarted || projectData?.project?.isStarted;
+  };
+
+  // Helper function to check if project is expired
+  const isProjectExpired = () => {
+    return projectData?.isExpired || projectData?.project?.isExpired;
+  };
+
+  // Helper function to check if project is completed
+  const isProjectCompleted = () => {
+    return projectData?.isCompleted || projectData?.project?.isCompleted;
+  };
+
+  // Helper function to determine if project is shared by current user or shared with current user
+  const isSharedByMe = () => {
+    // If sharedBy exists, it means someone else shared it with me
+    // If sharedBy doesn't exist but sharedWithUsers exists, it means I shared it with others
+    return !sharedBy && sharedWithUsers && sharedWithUsers.length > 0;
+  };
+
+  // Handler for Check Progress button
+  const handleCheckProgress = () => {
+    const projectId = projectData?.project?.id || projectData?.id;
+    const isReadOnly = !isSharedByMe(); // Read-only if shared with me (not shared by me)
+    
+    // Navigate to progress screen with read-only parameter
+    navigate(`/solution-function?projectId=${projectId}&readOnly=${isReadOnly}`);
+  };
+
   // Safety check for undefined projectData
   if (!projectData) {
     return null;
@@ -200,8 +239,8 @@ const ProjectCard = ({ projectData, index, onEdit, onDeleted, userData, sharedWi
             {/* Shared By User Display */}
             {sharedBy && (
               <div style={{ marginBottom: "20px", textAlign: "center" }}>
-                
-                <div 
+
+                <div
                   className="d-flex flex-column align-items-center"
                   style={{ cursor: "pointer" }}
                   onClick={() => handleUserClick(sharedBy.id)}
@@ -212,9 +251,9 @@ const ProjectCard = ({ projectData, index, onEdit, onDeleted, userData, sharedWi
                       src={sharedBy.image?.startsWith("http") ? sharedBy.image : `https://feedbackwork.net/feedbackapi/${sharedBy.image}`}
                       alt={`${sharedBy.firstname} ${sharedBy.lastname}`}
                       className="rounded-circle mb-2"
-                      style={{ 
-                        width: "80px", 
-                        height: "80px", 
+                      style={{
+                        width: "80px",
+                        height: "80px",
                         objectFit: "cover",
                         border: "3px solid #fff",
                         boxShadow: "0 4px 8px rgba(0,0,0,0.15)"
@@ -223,9 +262,9 @@ const ProjectCard = ({ projectData, index, onEdit, onDeleted, userData, sharedWi
                   ) : (
                     <div
                       className="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center mb-2"
-                      style={{ 
-                        width: "80px", 
-                        height: "80px", 
+                      style={{
+                        width: "80px",
+                        height: "80px",
                         fontWeight: "bold",
                         fontSize: "32px",
                         border: "3px solid #fff",
@@ -235,9 +274,9 @@ const ProjectCard = ({ projectData, index, onEdit, onDeleted, userData, sharedWi
                       {`${sharedBy.firstname?.charAt(0) || ""}${sharedBy.lastname?.charAt(0) || ""}`.toUpperCase()}
                     </div>
                   )}
-                  <span style={{ 
-                    fontSize: "18px", 
-                    fontWeight: "bold", 
+                  <span style={{
+                    fontSize: "18px",
+                    fontWeight: "bold",
                     color: "#333",
                     textAlign: "center"
                   }}>
@@ -254,67 +293,77 @@ const ProjectCard = ({ projectData, index, onEdit, onDeleted, userData, sharedWi
               Solution:{" "}
               <span className="pc-success">{projectData.solution || projectData?.project?.solution}</span>
             </p>
-                         <p className="mb-1">
-               Solution Function:{" "}
-               <span className="pc-success">{projectData.solutionFunction || projectData?.project?.solutionFunction}</span>
-             </p>
+            {/* Only show Solution Function if it has a value */}
+            {(projectData.solutionFunction || projectData?.project?.solutionFunction) && (
+              <p className="mb-1">
+                Solution Function:{" "}
+                <span className="pc-success">{projectData.solutionFunction || projectData?.project?.solutionFunction}</span>
+              </p>
+            )}
 
-             {/* Project Image - Always visible */}
-             {(projectData?.fullImageUrl || projectData?.project?.fullImageUrl) && (
-               <div style={{ marginTop: "10px" }}>
-                 <h6>Project Image</h6>
-                 <img
-                   src={projectData.fullImageUrl || projectData?.project?.fullImageUrl}
-                   alt="Project"
-                   style={{
-                     width: "100%",
-                     maxHeight: "200px",
-                     objectFit: "cover",
-                     borderRadius: "8px",
-                     marginBottom: "10px",
-                   }}
-                 />
-               </div>
-             )}
+            {/* Project Image - Only show if it has a value */}
+            {(projectData?.fullImageUrl || projectData?.project?.fullImageUrl) && (
+              <div style={{ marginTop: "10px" }}>
+                <h6>Project Image</h6>
+                <img
+                  src={projectData.fullImageUrl || projectData?.project?.fullImageUrl}
+                  alt="Project"
+                  style={{
+                    width: "100%",
+                    maxHeight: "200px",
+                    objectFit: "cover",
+                    borderRadius: "8px",
+                    marginBottom: "10px",
+                  }}
+                />
+              </div>
+            )}
 
-                          <Collapse in={isExpanded}>
-               <div>
-                 {!hideActions && (
-                   <>
-                     <p className="mb-1">
-                       Start Date:{" "}
-                       <span className="pc-grey">
-                         {formatDateTime(projectData?.stepConfig?.startTime || projectData?.project?.stepConfig?.startTime)}
-                       </span>
-                     </p>
-                     <p className="mb-1">
-                       End Date:{" "}
-                       <span className="pc-grey">
-                         {formatDateTime(projectData?.stepConfig?.endTime || projectData?.project?.stepConfig?.endTime)}
-                       </span>
-                     </p>
-                   </>
-                 )}
-
-                                   {!hideActions && (
-                    <>
+            <Collapse in={isExpanded}>
+              <div>
+                {!hideActions && (
+                  <>
+                    {/* Only show Start Date if it has a value */}
+                    {(projectData?.stepConfig?.startTime || projectData?.project?.stepConfig?.startTime) && (
                       <p className="mb-1">
-                        Total Feedback Requested: <span className="pc-info">10</span>
+                        Start Date:{" "}
+                        <span className="pc-grey">
+                          {formatDateTime(projectData?.stepConfig?.startTime || projectData?.project?.stepConfig?.startTime)}
+                        </span>
                       </p>
+                    )}
+                    {/* Only show End Date if it has a value */}
+                    {(projectData?.stepConfig?.endTime || projectData?.project?.stepConfig?.endTime) && (
                       <p className="mb-1">
-                        Total Feedback Received: <span className="pc-info">10</span>
+                        End Date:{" "}
+                        <span className="pc-grey">
+                          {formatDateTime(projectData?.stepConfig?.endTime || projectData?.project?.stepConfig?.endTime)}
+                        </span>
                       </p>
-                      <p className="mb-1">
-                        Total Feedback Applied: <span className="pc-info">10</span>
-                      </p>
-                    </>
-                                     )}
+                    )}
+                  </>
+                )}
 
-                {/* ✅ Youtube Video Embed */}
-                {projectData && (projectData.youtubeLink || projectData.project?.youtubeLink) &&
-                  isValidYoutubeUrl(projectData.youtubeLink || projectData.project?.youtubeLink) && (
-                    <div style={{ marginTop: "10px" }}>
-                      <h6>Youtube Link:</h6>
+                {!hideActions && (
+                  <>
+                    {/* Only show feedback statistics if they have meaningful values */}
+                    {/* <p className="mb-1">
+                      Total Feedback Requested: <span className="pc-info">10</span>
+                    </p> */}
+                    {/* <p className="mb-1">
+                      Total Feedback Received: <span className="pc-info">10</span>
+                    </p> */}
+                    {/* <p className="mb-1">
+                      Total Feedback Applied: <span className="pc-info">10</span>
+                    </p> */}
+                  </>
+                )}
+
+                {/* ✅ Youtube Video Embed - Only show if it has a value */}
+                {projectData && (projectData.youtubeLink || projectData.project?.youtubeLink) && (
+                  <div style={{ marginTop: "10px" }}>
+                    <h6>Youtube Link:</h6>
+                    {isValidYoutubeUrl(projectData.youtubeLink || projectData.project?.youtubeLink) ? (
                       <iframe
                         width="100%"
                         height="250"
@@ -327,18 +376,15 @@ const ProjectCard = ({ projectData, index, onEdit, onDeleted, userData, sharedWi
                         allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                         allowFullScreen
                       ></iframe>
-                    </div>
-                  )}
-                {projectData && (projectData.youtubeLink || projectData.project?.youtubeLink) &&
-                  !isValidYoutubeUrl(projectData.youtubeLink || projectData.project?.youtubeLink) && (
-                    <>
-                      <h6>Youtube Link:</h6>
+                    ) : (
                       <p style={{ color: "red", marginTop: "10px" }}>
                         Invalid YouTube Link
                       </p>
-                    </>
-                  )}
+                    )}
+                  </div>
+                )}
 
+                {/* Description - Only show if it has a value */}
                 {projectData && (projectData.description || projectData.project?.description) && (
                   <div style={{ marginTop: "10px" }}>
                     <h6>Description:</h6>
@@ -358,122 +404,111 @@ const ProjectCard = ({ projectData, index, onEdit, onDeleted, userData, sharedWi
             </Collapse>
 
             <p className="mb-3">
-              Status: <span className="pc-info">{projectData?.status || projectData?.project?.status}</span>
+              Status: <span className="pc-info">{getProjectStatus()}</span>
             </p>
 
-                         {!hideActions && (
-               <Button
-                 variant="primary"
-                 className="mb-2 pc-feedback-btn"
-                 onClick={() => navigate("/request-feedback")}
-               >
-                 Request Feedback
-               </Button>
-             )}
+            {!hideActions && (
+              <Button
+                variant="primary"
+                className="mb-2 pc-feedback-btn"
+                onClick={() => navigate("/request-feedback")}
+              >
+                Request Feedback
+              </Button>
+            )}
           </div>
 
           <Collapse in={isExpanded}>
             <div>
-                             {!hideActions && (
-                 <div className="d-flex justify-content-between align-items-center pc-share-row px-2 py-2">
-                                       <div className="d-flex gap-2 align-items-center">
-                      <button 
-                        className="transparent-btn" 
-                        onClick={handleEditClick}
-                        disabled={projectData?.isStarted || projectData?.project?.isStarted || projectData?.isExpired || projectData?.project?.isExpired || projectData?.isCompleted || projectData?.project?.isCompleted}
-                        style={{ 
-                          cursor: (projectData?.isStarted || projectData?.project?.isStarted || projectData?.isExpired || projectData?.project?.isExpired || projectData?.isCompleted || projectData?.project?.isCompleted) ? "not-allowed" : "pointer",
-                          opacity: (projectData?.isStarted || projectData?.project?.isStarted || projectData?.isExpired || projectData?.project?.isExpired || projectData?.isCompleted || projectData?.project?.isCompleted) ? 0.5 : 1,
-                          marginRight: "10px" 
-                        }}
-                      >
-                        <MdEdit />
-                      </button>
-                      <button
-                        className="transparent-btn"
-                        onClick={handleDeleteClick}
-                        disabled={projectData?.isStarted || projectData?.project?.isStarted || projectData?.isExpired || projectData?.project?.isExpired || projectData?.isCompleted || projectData?.project?.isCompleted}
-                        style={{ 
-                          cursor: (projectData?.isStarted || projectData?.project?.isStarted || projectData?.isExpired || projectData?.project?.isExpired || projectData?.isCompleted || projectData?.project?.isCompleted) ? "not-allowed" : "pointer",
-                          opacity: (projectData?.isStarted || projectData?.project?.isStarted || projectData?.isExpired || projectData?.project?.isExpired || projectData?.isCompleted || projectData?.project?.isCompleted) ? 0.5 : 1,
-                          marginRight: "10px" 
-                        }}
-                      >
-                        <MdDelete />
-                      </button>
+              {!hideActions && (
+                <div className="d-flex justify-content-between align-items-center pc-share-row px-2 py-2">
+                  <div className="d-flex gap-2 align-items-center">
+                                         <button 
+                       className="transparent-btn" 
+                       onClick={handleEditClick}
+                       disabled={isProjectStarted() || isProjectExpired() || isProjectCompleted()}
+                       style={{ 
+                         cursor: (isProjectStarted() || isProjectExpired() || isProjectCompleted()) ? "not-allowed" : "pointer",
+                         opacity: (isProjectStarted() || isProjectExpired() || isProjectCompleted()) ? 0.5 : 1,
+                         marginRight: "10px" 
+                       }}
+                     >
+                       <MdEdit />
+                     </button>
                      <button
                        className="transparent-btn"
-                       onClick={handleShareClick}
-                       >
-                       <MdShare style={{ cursor: "pointer" }} />
-                     </button>
-                   </div>
-                                                                               <Button
-                       variant={
-                         projectData?.isStarted || projectData?.project?.isStarted ? "warning" :
-                         projectData?.isExpired || projectData?.project?.isExpired ? "danger" :
-                         projectData?.isCompleted || projectData?.project?.isCompleted ? "success" : "primary"
-                       }
-                       onClick={handleStart}
-                       disabled={loading || projectData?.isStarted || projectData?.project?.isStarted || projectData?.isExpired || projectData?.project?.isExpired || projectData?.isCompleted || projectData?.project?.isCompleted}
+                       onClick={handleDeleteClick}
+                       disabled={isProjectStarted() || isProjectExpired() || isProjectCompleted()}
+                       style={{ 
+                         cursor: (isProjectStarted() || isProjectExpired() || isProjectCompleted()) ? "not-allowed" : "pointer",
+                         opacity: (isProjectStarted() || isProjectExpired() || isProjectCompleted()) ? 0.5 : 1,
+                         marginRight: "10px" 
+                       }}
                      >
-                       {projectData?.isStarted || projectData?.project?.isStarted ? "Started" : 
-                        projectData?.isExpired || projectData?.project?.isExpired ? "Expired" :
-                        projectData?.isCompleted || projectData?.project?.isCompleted ? "Completed" : "Start"}
-                     </Button>
-                 </div>
-               )}
+                       <MdDelete />
+                     </button>
+                    <button
+                      className="transparent-btn"
+                      onClick={handleShareClick}
+                    >
+                      <MdShare style={{ cursor: "pointer" }} />
+                    </button>
+                  </div>
+                  <Button
+                    variant={
+                      isProjectStarted() ? "warning" :
+                        isProjectExpired() ? "danger" :
+                          isProjectCompleted() ? "success" : "primary"
+                    }
+                    onClick={handleStart}
+                    disabled={loading || isProjectStarted() || isProjectExpired() || isProjectCompleted()}
+                  >
+                    {getProjectStatus()}
+                  </Button>
+                </div>
+              )}
 
-                             {!hideActions && (
-                 <div>
-                   <div
-                     className="d-flex justify-content-between align-items-center px-2 py-2 pc-second-expand"
-                     onClick={toggleProgressExpand}
-                     style={{ cursor: "pointer" }}
-                   >
-                     <h6>Check Progress</h6>
-                     {isProgressExpanded ? <AiOutlineUp /> : <AiOutlineDown />}
-                   </div>
-
-                                       <Collapse in={isProgressExpanded}>
-                      <div className="px-2 py-2">
-                        <p>Progress details go here...</p>
-                        
-                        {/* Navigation Arrow - Only show if project is started */}
-                        {(projectData?.isStarted || projectData?.project?.isStarted) && (
-                          <div className="text-center mt-3">
-                            <button
-                              onClick={() => navigate(`/solution-function?projectId=${projectData?.project?.id || projectData?.id}`)}
-                              className="btn btn-outline-primary btn-sm"
-                              style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                gap: '8px',
-                                margin: '0 auto'
-                              }}
-                            >
-                              <span>Go to Progress Screen</span>
-                              <svg 
-                                width="16" 
-                                height="16" 
-                                viewBox="0 0 24 24" 
-                                fill="none" 
-                                stroke="currentColor" 
-                                strokeWidth="2" 
-                                strokeLinecap="round" 
-                                strokeLinejoin="round"
-                              >
-                                <path d="M5 12h14"/>
-                                <path d="m12 5 7 7-7 7"/>
-                              </svg>
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    </Collapse>
-                 </div>
-               )}
+              {/* Conditional Check Progress Button - Only show if project is started */}
+              {!hideActions && isProjectStarted() && !isProjectExpired() && !isProjectCompleted() && (
+                <div className="px-2 py-2">
+                  <Button
+                    variant="outline-primary"
+                    className="w-100"
+                    onClick={handleCheckProgress}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '8px',
+                      padding: '10px 16px',
+                      fontSize: '14px',
+                      fontWeight: '500'
+                    }}
+                  >
+                    <svg
+                      width="16"
+                      height="16"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <path d="M5 12h14" />
+                      <path d="m12 5 7 7-7 7" />
+                    </svg>
+                    <span>
+                      {isSharedByMe() ? "Check Progress" : "View Progress (Read Only)"}
+                    </span>
+                  </Button>
+                  {!isSharedByMe() && (
+                    <small className="text-muted d-block text-center mt-2">
+                      You can view progress but cannot control the project
+                    </small>
+                  )}
+                </div>
+              )}
             </div>
           </Collapse>
         </Card.Body>
@@ -508,7 +543,7 @@ const ProjectCard = ({ projectData, index, onEdit, onDeleted, userData, sharedWi
           </DialogContentText>
         </DialogContent>
         <DialogActions>
-          <Button 
+          <Button
             onClick={handleStartConfirm}
             variant="contained"
             color="primary"
@@ -517,7 +552,7 @@ const ProjectCard = ({ projectData, index, onEdit, onDeleted, userData, sharedWi
           >
             {loading ? "Starting..." : "Start"}
           </Button>
-          <Button 
+          <Button
             onClick={handleEditClick}
             variant="outlined"
             style={{ border: '1px solid #ccc', color: 'black' }}
@@ -583,25 +618,25 @@ const ProjectCard = ({ projectData, index, onEdit, onDeleted, userData, sharedWi
                   <h4 className="mb-1">
                     {userProfileModal.userData.firstname} {userProfileModal.userData.lastname}
                   </h4>
-                                     <p className="text-muted mb-2">{userProfileModal.userData.email}</p>
-                   <div className="d-flex gap-2 justify-content-center">
-                     {userProfileModal.userData.expertise && (
-                       <span className="badge bg-primary">{userProfileModal.userData.expertise}</span>
-                     )}
-                     {userProfileModal.userData.title && (
-                       <span className="badge bg-secondary">{userProfileModal.userData.title}</span>
-                     )}
-                   </div>
+                  <p className="text-muted mb-2">{userProfileModal.userData.email}</p>
+                  <div className="d-flex gap-2 justify-content-center">
+                    {userProfileModal.userData.expertise && (
+                      <span className="badge bg-primary">{userProfileModal.userData.expertise}</span>
+                    )}
+                    {userProfileModal.userData.title && (
+                      <span className="badge bg-secondary">{userProfileModal.userData.title}</span>
+                    )}
+                  </div>
                 </div>
 
                 {/* Contact Information */}
                 <div className="mb-4">
                   <h5 className="mb-3">Contact Information</h5>
                   <div className="row">
-                                         <div className="col-md-6 mb-3">
-                       <strong>Email:</strong>
-                       <p className="text-muted mb-0">{userProfileModal.userData.email}</p>
-                     </div>
+                    <div className="col-md-6 mb-3">
+                      <strong>Email:</strong>
+                      <p className="text-muted mb-0">{userProfileModal.userData.email}</p>
+                    </div>
                     {userProfileModal.userData.location && (
                       <div className="col-md-6 mb-3">
                         <strong>Location:</strong>
@@ -668,23 +703,23 @@ const ProjectCard = ({ projectData, index, onEdit, onDeleted, userData, sharedWi
                 )}
 
                 {/* Statistics */}
-                                 <div className="mb-4">
-                   <h5 className="mb-3">Statistics</h5>
-                   <div className="row">
-                     <div className="col-md-6 text-center mb-3">
-                       <div className="border rounded p-3">
-                         <h4 className="text-success mb-1">{userProfileModal.userData.totalFeedbackProvided || 0}</h4>
-                         <small className="text-muted">Feedback Provided</small>
-                       </div>
-                     </div>
-                     <div className="col-md-6 text-center mb-3">
-                       <div className="border rounded p-3">
-                         <h4 className="text-info mb-1">{userProfileModal.userData.totalFeedbackReceived || 0}</h4>
-                         <small className="text-muted">Feedback Received</small>
-                       </div>
-                     </div>
-                   </div>
-                 </div>
+                <div className="mb-4">
+                  <h5 className="mb-3">Statistics</h5>
+                  <div className="row">
+                    <div className="col-md-6 text-center mb-3">
+                      <div className="border rounded p-3">
+                        <h4 className="text-success mb-1">{userProfileModal.userData.totalFeedbackProvided || 0}</h4>
+                        <small className="text-muted">Feedback Provided</small>
+                      </div>
+                    </div>
+                    <div className="col-md-6 text-center mb-3">
+                      <div className="border rounded p-3">
+                        <h4 className="text-info mb-1">{userProfileModal.userData.totalFeedbackReceived || 0}</h4>
+                        <small className="text-muted">Feedback Received</small>
+                      </div>
+                    </div>
+                  </div>
+                </div>
 
                 {/* Additional Information */}
                 {userProfileModal.userData.createdAt && (

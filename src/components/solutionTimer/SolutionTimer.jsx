@@ -7,10 +7,12 @@ import {
   getProjectProgressDetail,
   resumeProjectProgress,
   pauseProjectProgress,
-  updateProjectProgress
+  updateProjectProgress,
+  endProject
 } from "../../api/projectApi";
+import { toast } from "react-toastify";
 
-export default function SolutionTimer({ projectId }) {
+export default function SolutionTimer({ projectId, readOnly = false, projectData: initialProjectData }) {
   const houseWidth = 500;
   const stopOffset = 70;
   const totalTime = 20000; // fallback demo value; real end time used below
@@ -29,6 +31,7 @@ export default function SolutionTimer({ projectId }) {
   const [timerId, setTimerId] = useState(null);
   const [totalPausedMs, setTotalPausedMs] = useState(0);
   const [displayPercent, setDisplayPercent] = useState(0);
+  const [showMarkComplete, setShowMarkComplete] = useState(false);
   const intervalRef = useRef(null);
 
   useEffect(() => {
@@ -37,8 +40,14 @@ export default function SolutionTimer({ projectId }) {
       setProgressWidth(progWidth);
       const calculatedMaxDistance = houseWidth - progWidth - stopOffset;
       setMaxDistance(calculatedMaxDistance);
+      
+      // If we have project data, update progress position after maxDistance is set
+      if (project && displayPercent > 0) {
+        const newProgress = (displayPercent / 100) * calculatedMaxDistance;
+        setProgress(Math.min(calculatedMaxDistance, newProgress));
+      }
     }
-  }, [progressRef.current]);
+  }, [progressRef.current, project, displayPercent]);
 
   // Helpers mapped from provided pseudocode
   const calculateProgress = ({ startDateTime, totalPausedDuration, percentPerHour: pph, manualProgress }) => {
@@ -61,16 +70,29 @@ export default function SolutionTimer({ projectId }) {
   };
 
   const refreshElapsed = (proj, now = new Date()) => {
-    const start = new Date(proj?.startTime || proj?.stepConfig?.startTime);
-    const pausedMs = Number(proj?.totalPauseTime || 0);
-    setElapsedTimeStr(timeConsumed({ start, now, pausedTime: pausedMs }));
+    // Use actual working time from API if available, otherwise calculate
+    if (proj?.actualWorkingTimeFormatted) {
+      setElapsedTimeStr(proj.actualWorkingTimeFormatted);
+    } else {
+      const start = new Date(proj?.startTime || proj?.stepConfig?.startTime);
+      const pausedMs = Number(proj?.totalPauseTime || 0);
+      setElapsedTimeStr(timeConsumed({ start, now, pausedTime: pausedMs }));
+    }
   };
 
   const loadDetail = async () => {
     if (!projectId) return;
-    const res = await getProjectProgressDetail(projectId);
-    const data = res?.data?.data || {};
-    setProject(data);
+    
+    let data;
+    // Use initial project data if provided (from parent component)
+    if (initialProjectData) {
+      setProject(initialProjectData);
+      data = initialProjectData;
+    } else {
+      const res = await getProjectProgressDetail(projectId);
+      data = res?.data?.data || {};
+      setProject(data);
+    }
 
     const start = new Date(data?.startTime || data?.stepConfig?.startTime);
     const end = new Date(data?.endTime || data?.stepConfig?.endTime);
@@ -84,9 +106,17 @@ export default function SolutionTimer({ projectId }) {
 
     // Initialize progress and elapsed
     const initialProgress = Number(data?.currentProgress || 0);
-    setProgress(initialProgress / 100 * maxDistance);
     setDisplayPercent(initialProgress);
+    
+    // Set progress position only if maxDistance is available
+    if (maxDistance > 0) {
+      setProgress(initialProgress / 100 * maxDistance);
+    }
+    
     refreshElapsed(data);
+
+    // Check if project is at 100% and show mark complete button
+    setShowMarkComplete(initialProgress >= 100 && !data?.isCompleted && !data?.isExpired);
 
     // Console logging for initial data
     console.log('📊 Project Data Loaded:', {
@@ -102,6 +132,8 @@ export default function SolutionTimer({ projectId }) {
       totalDuration: `${((end - start) / (1000 * 60 * 60)).toFixed(2)} hours`,
       stepsPerHour: pph,
       totalPauseTime: `${(pausedMs / (1000 * 60)).toFixed(2)} minutes`,
+      actualWorkingTime: data?.actualWorkingTime,
+      remainingTime: data?.remainingTime,
       initialProgress,
       maxDistance
     });
@@ -127,27 +159,33 @@ export default function SolutionTimer({ projectId }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId]);
 
+  // Update progress position when maxDistance changes and we have displayPercent
+  useEffect(() => {
+    if (maxDistance > 0 && displayPercent > 0) {
+      const newProgress = (displayPercent / 100) * maxDistance;
+      setProgress(Math.min(maxDistance, newProgress));
+    }
+  }, [maxDistance, displayPercent]);
+
   const startAutoTimer = (start, end, pph, pausedMs, apiProgress = 0) => {
     if (intervalRef.current) clearInterval(intervalRef.current);
     setIsRunning(true);
     
-    // Calculate total project duration (like your old totalTime)
+    // Calculate total project duration
     const totalDuration = end - start;
     const totalTimeMs = totalDuration - pausedMs;
     
-    // Calculate how much time has already passed
-    const now = new Date();
-    const elapsedTime = now - start - pausedMs;
+    // Use API progress as the starting point (this accounts for pause/resume history)
+    let currentProgressPercent = apiProgress;
     
-    // Calculate current progress percentage
-    let currentProgressPercent = Math.min(100, (elapsedTime / totalTimeMs) * 100);
-    
-    // If API provides progress, use it as starting point
-    if (apiProgress > 0) {
-      currentProgressPercent = apiProgress;
+    // If no API progress, calculate from time
+    if (apiProgress <= 0) {
+      const now = new Date();
+      const elapsedTime = now - start - pausedMs;
+      currentProgressPercent = Math.min(100, (elapsedTime / totalTimeMs) * 100);
     }
     
-    // Set initial position
+    // Set initial position based on API progress
     const initialPx = (currentProgressPercent / 100) * maxDistance;
     setProgress(Math.min(maxDistance, initialPx));
     setDisplayPercent(currentProgressPercent);
@@ -159,9 +197,9 @@ export default function SolutionTimer({ projectId }) {
       initialPx,
       maxDistance,
       totalTimeMs: `${(totalTimeMs / (1000 * 60 * 60)).toFixed(2)} hours`,
-      elapsedTime: `${(elapsedTime / (1000 * 60 * 60)).toFixed(2)} hours`,
-      timeFor1Percent: `${(totalTimeMs / 100).toFixed(2)}ms per 1%`,
-      timeFor1PercentSeconds: `${((totalTimeMs / 100) / 1000).toFixed(2)} seconds per 1%`
+      remainingProgress: `${remainingProgress.toFixed(2)}%`,
+      remainingTime: `${(remainingTime / (1000 * 60 * 60)).toFixed(2)} hours`,
+      animationStep: `${animationStep.toFixed(4)} pixels per 100ms`
     });
     
     // If already at 100%, don't start animation
@@ -171,12 +209,14 @@ export default function SolutionTimer({ projectId }) {
       return;
     }
     
-    // Calculate remaining time for animation
-    const remainingTime = Math.max(0, totalTimeMs - elapsedTime);
-    const animationStep = maxDistance / (remainingTime / 100); // pixels per 100ms
+    // Calculate remaining time for animation from current progress
+    const remainingProgress = 100 - currentProgressPercent;
+    const remainingTime = Math.max(0, (remainingProgress / 100) * totalTimeMs);
+    const animationStep = (remainingProgress / 100) * maxDistance / (remainingTime / 100); // pixels per 100ms
     
     console.log('⏱️ Animation Timing (Simplified):', {
       totalTimeMs: `${(totalTimeMs / (1000 * 60 * 60)).toFixed(2)} hours`,
+      remainingProgress: `${remainingProgress.toFixed(2)}%`,
       remainingTime: `${(remainingTime / (1000 * 60 * 60)).toFixed(2)} hours`,
       animationStep: `${animationStep.toFixed(4)} pixels per 100ms`
     });
@@ -255,8 +295,14 @@ export default function SolutionTimer({ projectId }) {
         setPercentPerHour(pph);
         setTotalPausedMs(pausedMs);
         
-        // Start animation with fresh data - use API progress
+        // Start animation with fresh data - use API progress (accounts for pause/resume history)
         const updatedProgress = Number(updatedData?.currentProgress || 0);
+        console.log('🔄 Resuming with updated progress:', {
+          updatedProgress,
+          totalPauseTime: updatedData?.totalPauseTime,
+          actualWorkingTime: updatedData?.actualWorkingTime,
+          isPaused: updatedData?.isPaused
+        });
         startAutoTimer(start, end, pph, pausedMs, updatedProgress);
         
       } catch (error) {
@@ -277,6 +323,7 @@ export default function SolutionTimer({ projectId }) {
         const apiProgress = Number(project?.currentProgress || 0);
         const start = new Date(project?.startTime || project?.stepConfig?.startTime);
         const end = new Date(project?.endTime || project?.stepConfig?.endTime);
+        console.log('🔄 Switching back to automatic mode with API progress:', apiProgress);
         startAutoTimer(start, end, percentPerHour, totalPausedMs, apiProgress);
       }
     }
@@ -303,6 +350,19 @@ export default function SolutionTimer({ projectId }) {
     } catch {}
   };
 
+  const handleMarkComplete = async () => {
+    if (!project) return;
+    
+    try {
+      await endProject(project.projectId || project.id);
+      toast.success("Project marked as completed successfully!");
+      await loadDetail(); // Reload to get updated status
+    } catch (error) {
+      console.error("Failed to mark project as complete:", error);
+      toast.error("Failed to mark project as complete");
+    }
+  };
+
   const percentDisplay = Math.round(displayPercent);
 
   return (
@@ -313,38 +373,74 @@ export default function SolutionTimer({ projectId }) {
           <div className="progress-timer-wrap" ref={progressRef} style={{ left: `${progress}px`, transition: "left 0.1s linear" }}>
             <div className="inner-timer-text">
               <img src={ProgressImg} alt="Progress" />
-              <span className="timer-span">{String(Math.min(99, percentDisplay)).padStart(2, "0")}</span>
+              <span className="timer-span">{String(percentDisplay).padStart(2, "0")}</span>
               <span className="timer-completed-percent">{percentDisplay}% Completed</span>
+              <div className="consumed-time" style={{ fontSize: "12px", marginTop: "5px", color: "#666" }}>
+                Time: {elapsedTimeStr}
+              </div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Start/Stop Button */}
-      <div className="text-center mt-3">
-        <button onClick={toggleTimer} disabled={manualControl} className={`btn px-4 py-2 rounded-5 ${isRunning ? "btn-danger" : "btn-primary"}`}>
-          {isRunning ? <FaStop className="me-2" /> : <FaPlay className="me-2" />}
-          {isRunning ? "Pause" : "Resume"}
-        </button>
-      </div>
+      {/* Start/Stop Button - Only show if not read-only and project is not completed/expired */}
+      {!readOnly && !project?.isCompleted && !project?.isExpired && (
+        <div className="text-center mt-3">
+          <button onClick={toggleTimer} disabled={manualControl} className={`btn px-4 py-2 rounded-5 ${isRunning ? "btn-danger" : "btn-primary"}`}>
+            {isRunning ? <FaStop className="me-2" /> : <FaPlay className="me-2" />}
+            {isRunning ? "Pause" : "Resume"}
+          </button>
+        </div>
+      )}
 
-      {/* Manual Control Checkbox */}
-      <div className="mt-3">
-        <input type="checkbox" id="manualStatus" checked={manualControl} onChange={handleManualControl} />
-        <label htmlFor="manualStatus" className="ms-2">Enable Manual Status</label>
-      </div>
+      {/* Manual Control Checkbox - Only show if not read-only and project is not completed/expired */}
+      {!readOnly && !project?.isCompleted && !project?.isExpired && (
+        <div className="mt-3">
+          <input type="checkbox" id="manualStatus" checked={manualControl} onChange={handleManualControl} />
+          <label htmlFor="manualStatus" className="ms-2">Enable Manual Status</label>
+        </div>
+      )}
 
-      {/* Progress Slider */}
-      <div className="text-center mt-3 timer-slider">
-        <input type="range" min="0" max={maxDistance} value={progress} onChange={handleSliderChange} disabled={!manualControl} className="form-range" />
-        <span className="slider-mark-0 slider-mark">0</span>
-        <span className="slider-mark-50 slider-mark">50</span>
-        <span className="slider-mark-10 slider-mark">100</span>
-      </div>
+      {/* Progress Slider - Only show if not read-only and project is not completed/expired */}
+      {!readOnly && !project?.isCompleted && !project?.isExpired && (
+        <div className="text-center mt-3 timer-slider">
+          <input type="range" min="0" max={maxDistance} value={progress} onChange={handleSliderChange} disabled={!manualControl} className="form-range" />
+          <span className="slider-mark-0 slider-mark">0</span>
+          <span className="slider-mark-50 slider-mark">50</span>
+          <span className="slider-mark-10 slider-mark">100</span>
+        </div>
+      )}
 
-      <div className="stimer-update-btn mt-5">
-        <button className="btn btn-secondary px-3" onClick={handleUpdateManual} disabled={!manualControl}>Update</button>
-      </div>
+      {/* Update Button - Only show if not read-only and project is not completed/expired */}
+      {!readOnly && !project?.isCompleted && !project?.isExpired && (
+        <div className="stimer-update-btn mt-5">
+          <button className="btn btn-secondary px-3" onClick={handleUpdateManual} disabled={!manualControl}>Update</button>
+        </div>
+      )}
+
+      {/* Mark Complete Button - Only show when project reaches 100% and not completed/expired */}
+      {showMarkComplete && !readOnly && (
+        <div className="text-center mt-4">
+          <button 
+            className="btn btn-success px-4 py-2" 
+            onClick={handleMarkComplete}
+          >
+            Mark Complete
+          </button>
+          <p className="text-muted mt-2 small">
+            Project has reached 100% completion. Click to mark as completed.
+          </p>
+        </div>
+      )}
+
+      {/* Read-only message */}
+      {readOnly && (
+        <div className="text-center mt-4">
+          <div className="alert alert-info">
+            <strong>Read Only Mode:</strong> You can view the project progress but cannot control it.
+          </div>
+        </div>
+      )}
     </div>
   );
 }

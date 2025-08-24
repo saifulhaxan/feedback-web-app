@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useMemo } from "react";
+import { useLocation } from "react-router-dom";
 import { Box, Button, Modal, Avatar, Badge } from "@mui/material";
 import { MdAddCircle, MdModeEdit } from "react-icons/md";
 import { FaCheck } from "react-icons/fa";
@@ -41,6 +42,7 @@ const style = {
 };
 
 export default function ManageRelationPage() {
+  const location = useLocation();
   // Get current user data and role for role-based restrictions
   const { userData } = useUserStore();
   const currentUserRole = userData?.user?.role?.name;
@@ -89,11 +91,15 @@ export default function ManageRelationPage() {
 
   const [formData, setFormData] = useState(initialFormData);
   const [editFormData, setEditFormData] = useState(initialFormData);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const [otpData, setOtpData] = useState({
     childId: '',
     email: ''
   })
+
+  const [innerTab, setInnerTab] = useState("MY");
 
   const handleOpen = () => setOpen(true);
   const handleEditOpen = (child) => {
@@ -175,7 +181,11 @@ export default function ManageRelationPage() {
       try {
         const { data } = await removeSecondaryParent(parentId);
         toast.success(data?.data?.data?.message || "Parent removed successfully!");
-        fetchParents(); // Refresh the parents list
+        // Refresh all data as relationships have changed
+        fetchParents();
+        fetchChild();
+        fetchRequests(false);
+        fetchRequests(true);
       } catch (error) {
         toast.error(error?.response?.data?.message || "Failed to remove parent");
       }
@@ -195,6 +205,12 @@ export default function ManageRelationPage() {
       // Refresh both received and sent requests
       fetchRequests(false);
       fetchRequests(true);
+      
+      // Also refresh children and parents data as relationships may have changed
+      fetchChild();
+      if (isParent) {
+        fetchParents();
+      }
     } catch (error) {
       toast.error(error?.response?.data?.message || `Failed to ${action} request`);
     }
@@ -216,8 +232,26 @@ export default function ManageRelationPage() {
     }
   };
 
+  // Function to refresh all data after verification
+  const refreshAllData = () => {
+    fetchChild();
+    if (isParent) {
+      fetchParents();
+    }
+    fetchRequests(false);
+    fetchRequests(true);
+  };
+
 
   useEffect(() => {
+    // Check URL parameters for tab selection
+    const urlParams = new URLSearchParams(location.search);
+    const tabParam = urlParams.get('tab');
+    
+    if (tabParam === 'children') {
+      setActiveTab("Children");
+    }
+    
     fetchChild();
     // Only fetch parents data if user is a parent
     if (isParent) {
@@ -225,7 +259,7 @@ export default function ManageRelationPage() {
     }
     fetchRequests(false); // Fetch received requests
     fetchRequests(true);  // Fetch sent requests
-  }, [isParent])
+  }, [isParent, location.search])
 
   // Refresh data when active tab changes
   useEffect(() => {
@@ -238,6 +272,21 @@ export default function ManageRelationPage() {
       fetchRequests(true);  // Fetch sent requests
     }
   }, [activeTab, isParent])
+
+  // Refresh data when inner tab changes
+  useEffect(() => {
+    if (activeTab === "Children") {
+      fetchChild();
+    }
+  }, [innerTab])
+
+  // Refresh data when request tab changes
+  useEffect(() => {
+    if (activeTab === "Requests") {
+      fetchRequests(false); // Fetch received requests
+      fetchRequests(true);  // Fetch sent requests
+    }
+  }, [activeRequestTab])
 
   const handleClose = () => {
     setFormData(initialFormData);
@@ -382,21 +431,51 @@ export default function ManageRelationPage() {
 
         // Send OTP immediately after successful creation
         try {
-          const otpResp = await sendChildOtp({ childId: createdChild?.id, email: createdChild?.email });
-          toast.success(otpResp?.data?.data?.message || "OTP sent successfully!");
+          console.log("🚀 Sending OTP for child:", createdChild?.id, createdChild?.email);
+          const otpResult = await sendChildOtp({ childId: createdChild?.id, email: createdChild?.email });
+          console.log("✅ OTP sent successfully, result:", otpResult);
+          
+          // Show success toast
+          toast.success("Child created successfully! OTP sent for verification.");
+          
+          // Save to store
+          useUserStore.getState().setUserData({
+            user: {
+              childId: createdChild?.id,
+              email: createdChild?.email,
+            }
+          });
+
+          // Close modal and refresh data
+          handleClose();
+          fetchChild();
+          
+          // Navigate immediately
+          console.log("✅ Navigating to verification screen");
+          console.log("✅ Navigation state:", { 
+            childId: createdChild?.id, 
+            email: createdChild?.email 
+          });
+          
+          // Use window.location as fallback if navigate doesn't work
+          try {
+            navigate("/verify-otp-data", { 
+              state: { 
+                childId: createdChild?.id, 
+                email: createdChild?.email 
+              } 
+            });
+          } catch (navError) {
+            console.error("❌ Navigation error:", navError);
+            window.location.href = "/verify-otp-data";
+          }
         } catch (otpErr) {
+          console.error("❌ OTP Error:", otpErr);
+          console.error("❌ OTP Error Response:", otpErr?.response);
+          console.error("❌ OTP Error Message:", otpErr?.message);
           toast.error(otpErr?.response?.data?.message || "Failed to send OTP");
           return;
         }
-
-        // Save to store and navigate to verification screen
-        useUserStore.getState().setUser({
-          childId: createdChild?.id,
-          email: createdChild?.email,
-        });
-
-        handleClose();
-        navigate("/verify-otp-data", { state: { childId: createdChild?.id, email: createdChild?.email } });
       } catch (error) {
         toast.error(error?.response?.data?.message || "Failed to create child");
       }
@@ -438,7 +517,8 @@ export default function ManageRelationPage() {
 
         toast.success(payload?.data?.data?.message || "Child updated successfully!");
         handleEditClose();
-        fetchChild(); // Refresh the children list
+        // Refresh children list immediately
+        fetchChild();
       } catch (error) {
         console.error("❌ Edit child API error:", error);
         console.error("❌ Error response:", error?.response);
@@ -467,9 +547,6 @@ export default function ManageRelationPage() {
 
 
   // Removed OTP side-effect; handled inline after creation to avoid duplicate toasts
-
-
-  const [innerTab, setInnerTab] = useState("MY");
 
   // Role-based tab filtering
   const availableTabs = useMemo(() => {
@@ -782,7 +859,7 @@ console.log('myChildrenArr', myParentArr)
                           </div>
                           <div className="group-description-wrap">
                             <h6 className="mb-1 fw-bold">
-                              {request.requester?.firstName + ' ' + request.requester?.lastname}
+                              {request.requester?.firstName + ' ' + (request.requester?.lastname || '')}
                             </h6>
                             <p className="mb-0 fw-500">Parent Request</p>
                             <p className="mb-2 text-muted small">
@@ -834,7 +911,7 @@ console.log('myChildrenArr', myParentArr)
                           </div>
                           <div className="group-description-wrap">
                             <h6 className="mb-1 fw-bold">
-                              {request.receiver?.firstName + ' ' + request.receiver?.lastname}
+                              {request.receiver?.firstName + ' ' + (request.receiver?.lastname || '')}
                             </h6>
                             <p className="mb-0 fw-500">Request Sent</p>
                             <p className="mb-2 text-muted small">
@@ -973,22 +1050,44 @@ console.log('myChildrenArr', myParentArr)
 
               <div className="form-group mb-3">
                 <label className="auth-label">Password</label>
-                <div className="authInputWrap d-flex align-items-center">
-                  <input id="password" type="password" className="form-control auth-input" value={formData.password} onChange={handleChange} />
+                <div className="authInputWrap d-flex align-items-center position-relative">
+                  <input 
+                    id="password" 
+                    type={showPassword ? "text" : "password"} 
+                    className="form-control auth-input" 
+                    value={formData.password} 
+                    onChange={handleChange} 
+                  />
+                  <button
+                    type="button"
+                    className="btn btn-link position-absolute end-0 me-3"
+                    onClick={() => setShowPassword(!showPassword)}
+                    style={{ zIndex: 10 }}
+                  >
+                    {showPassword ? "Hide" : "Show"}
+                  </button>
                 </div>
                 {formErrors.password && <small className="text-danger">{formErrors.password}</small>}
               </div>
 
               <div className="form-group mb-3">
                 <label className="auth-label">Re-enter Password</label>
-                <div className="authInputWrap d-flex align-items-center">
+                <div className="authInputWrap d-flex align-items-center position-relative">
                   <input
                     id="confirmPassword"
-                    type="password"
+                    type={showConfirmPassword ? "text" : "password"}
                     className="form-control auth-input"
                     value={formData.confirmPassword}
                     onChange={handleChange}
                   />
+                  <button
+                    type="button"
+                    className="btn btn-link position-absolute end-0 me-3"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    style={{ zIndex: 10 }}
+                  >
+                    {showConfirmPassword ? "Hide" : "Show"}
+                  </button>
                 </div>
 
                 {formErrors.confirmPassword && <small className="text-danger">{formErrors.confirmPassword}</small>}
@@ -1057,7 +1156,9 @@ console.log('myChildrenArr', myParentArr)
               </div>
 
               <div className="form-group mb-3">
-                <label className="auth-label">Email (Read-only)</label>
+                <label className="auth-label">
+                  Email {editingChild?.isVerified ? "(Verified - Read-only)" : "(Editable)"}
+                </label>
                 <div className="authInputWrap d-flex align-items-center">
                   <input
                     id="email"
@@ -1065,8 +1166,12 @@ console.log('myChildrenArr', myParentArr)
                     className="form-control auth-input"
                     placeholder="Enter email"
                     value={editFormData.email}
-                    readOnly
-                    style={{ backgroundColor: '#f8f9fa', cursor: 'not-allowed' }}
+                    onChange={handleEditChange}
+                    readOnly={editingChild?.isVerified}
+                    style={{ 
+                      backgroundColor: editingChild?.isVerified ? '#f8f9fa' : 'white',
+                      cursor: editingChild?.isVerified ? 'not-allowed' : 'text'
+                    }}
                   />
                 </div>
                 <small className="text-muted">Email cannot be changed</small>
