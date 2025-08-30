@@ -1,13 +1,16 @@
 import Fetcher from "../library/Fetcher";
 
 // Get All Connections
-export const getAllConnections = async (projectId, query, skip = 0, take = 20) => {
+export const getAllConnections = async (projectId, query, skip = 0, take = 20, excludeGroupId = null) => {
   const params = new URLSearchParams();
   if (projectId) {
     params.append('projectId', projectId);
   }
   if (query) {
     params.append('q', query);
+  }
+  if (excludeGroupId) {
+    params.append('excludeGroupId', excludeGroupId);
   }
   params.append('skip', skip);
   params.append('take', take);

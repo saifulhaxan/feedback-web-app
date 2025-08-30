@@ -314,7 +314,59 @@ export default function ManageRelationPage() {
   const gradeCategory = ["1st Grade", "2nd Grade", "3rd Grade", "4rth Grade", "5th Grade", "6th Grade"];
 
   const toggleExpand = () => setIsExpanded((prev) => !prev);
-  const handleSwitchTabs = (e) => setActiveTab(e.target.name);
+  const handleSwitchTabs = (tabNameOrEvent) => {
+    // Handle both direct tab name and event object
+    const newTab = typeof tabNameOrEvent === 'string' 
+      ? tabNameOrEvent 
+      : tabNameOrEvent.target?.name || tabNameOrEvent;
+    
+    console.log('Switching to tab:', newTab); // Debug log
+    
+    // Clear existing data before switching tabs to prevent stale data
+    setChildArr([]);
+    setParentArr([]);
+    setSentRequests([]);
+    setReceivedRequests([]);
+    
+    // Set the new active tab
+    setActiveTab(newTab);
+    
+    // Force immediate data refresh for the new tab
+    setTimeout(() => {
+      if (newTab === "Parents" && isParent) {
+        fetchParents();
+      } else if (newTab === "Children") {
+        fetchChild();
+      } else if (newTab === "Request") {
+        fetchRequests(false); // Fetch received requests
+        fetchRequests(true);  // Fetch sent requests
+      }
+    }, 100); // Small delay to ensure state is updated
+  };
+
+  // Handler for inner tab switching (MY/Linked)
+  const handleSwitchInnerTabs = (newInnerTab) => {
+    setInnerTab(newInnerTab);
+    
+    // Clear and refresh children data when switching inner tabs
+    setChildArr([]);
+    setTimeout(() => {
+      fetchChild();
+    }, 100);
+  };
+
+  // Handler for request tab switching (Received/Sent)
+  const handleSwitchRequestTabs = (newRequestTab) => {
+    setActiveRequestTab(newRequestTab);
+    
+    // Clear and refresh request data when switching request tabs
+    setSentRequests([]);
+    setReceivedRequests([]);
+    setTimeout(() => {
+      fetchRequests(false); // Fetch received requests
+      fetchRequests(true);  // Fetch sent requests
+    }, 100);
+  };
 
   const handleChange = (e) => {
     const { id, value } = e.target;
@@ -611,8 +663,7 @@ console.log('myChildrenArr', myParentArr)
                     fontWeight: "bold",
                   }}
                   className="me-2"
-                  name={tab}
-                  onClick={handleSwitchTabs}
+                  onClick={() => handleSwitchTabs(tab)}
                 >
                   {tab}
                 </Button>
@@ -686,13 +737,13 @@ console.log('myChildrenArr', myParentArr)
               <div className="mb-3 d-flex gap-3">
                 <button
                   className={`btn p-2 py-1 ${innerTab === "MY" ? "btn-primary" : "btn-outline-primary"}`}
-                  onClick={() => setInnerTab("MY")}
+                  onClick={() => handleSwitchInnerTabs("MY")}
                 >
                   MY
                 </button>
                 <button
                   className={`btn p-2 py-1 ${innerTab === "Linked" ? "btn-primary" : "btn-outline-primary"}`}
-                  onClick={() => setInnerTab("Linked")}
+                  onClick={() => handleSwitchInnerTabs("Linked")}
                 >
                   Linked
                 </button>
@@ -842,13 +893,13 @@ console.log('myChildrenArr', myParentArr)
               <div className="mb-3 d-flex gap-3">
                 <button
                   className={`btn p-2 py-1 ${activeRequestTab === "Received" ? "btn-primary" : "btn-outline-primary"}`}
-                  onClick={() => setActiveRequestTab("Received")}
+                  onClick={() => handleSwitchRequestTabs("Received")}
                 >
                   Received
                 </button>
                 <button
                   className={`btn p-2 py-1 ${activeRequestTab === "Sent" ? "btn-primary" : "btn-outline-primary"}`}
-                  onClick={() => setActiveRequestTab("Sent")}
+                  onClick={() => handleSwitchRequestTabs("Sent")}
                 >
                   Sent
                 </button>
@@ -882,19 +933,19 @@ console.log('myChildrenArr', myParentArr)
                             {request.requester?.image ? (
                               <img 
                                 src={`https://feedbackwork.net/feedbackapi/${request.requester.image.replace(/^\/+/, "")}`}
-                                alt={request.requester.firstName + ' ' + request.requester.lastname} 
+                                alt={request.requester.firstname + ' ' + request.requester.lastname} 
                               />
                             ) : (
                               <div className="avatar-circle">
                                 <span className="avatar-text">
-                                  {(request.requester?.firstName?.charAt(0) || 'U').toUpperCase()}
+                                  {(request.requester?.firstname?.charAt(0) || 'U').toUpperCase()}
                                 </span>
                               </div>
                             )}
                           </div>
                           <div className="group-description-wrap">
                             <h6 className="mb-1 fw-bold">
-                              {request.requester?.firstName + ' ' + (request.requester?.lastname || '')}
+                              {request.requester?.firstname + ' ' + (request.requester?.lastname || '')}
                             </h6>
                             <p className="mb-0 fw-500">Parent Request</p>
                             <p className="mb-2 text-muted small">
@@ -934,19 +985,19 @@ console.log('myChildrenArr', myParentArr)
                             {request.receiver?.image ? (
                               <img 
                                 src={`https://feedbackwork.net/feedbackapi/${request.receiver.image.replace(/^\/+/, "")}`}
-                                alt={request.receiver.firstName + ' ' + request.receiver.lastname} 
+                                alt={request.receiver.firstname + ' ' + request.receiver.lastname} 
                               />
                             ) : (
                               <div className="avatar-circle">
                                 <span className="avatar-text">
-                                  {(request.receiver?.firstName?.charAt(0) || 'U').toUpperCase()}
+                                  {(request.receiver?.firstname?.charAt(0) || 'U').toUpperCase()}
                                 </span>
                               </div>
                             )}
                           </div>
                           <div className="group-description-wrap">
                             <h6 className="mb-1 fw-bold">
-                              {request.receiver?.firstName + ' ' + (request.receiver?.lastname || '')}
+                              {request.receiver?.firstname + ' ' + (request.receiver?.lastname || '')}
                             </h6>
                             <p className="mb-0 fw-500">Request Sent</p>
                             <p className="mb-2 text-muted small">

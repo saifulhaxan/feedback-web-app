@@ -103,6 +103,7 @@ function ProjectPage() {
   const [modalTab, setModalTab] = useState(1);
   const [projectData, setProjectData] = useState();
   const [numberOfSteps, setNumberOfSteps] = useState(""); // New field for number of steps
+  const [formErrors, setFormErrors] = useState({}); // Form validation errors
 
   // Step 2 states
   const [startDate, setStartDate] = useState("");
@@ -953,8 +954,8 @@ function ProjectPage() {
                         type="text"
                         className="form-control auth-input"
                         placeholder="Type here"
-                        value={projectName}
-                        onChange={(e) => handleInputChangeWithValidation(e, setProjectName, setFormErrors, 'projectName')}
+                        value={projectName || ''}
+                        onChange={(e) => setProjectName(e.target.value)}
                       />
                     </div>
                   </div>
@@ -968,7 +969,7 @@ function ProjectPage() {
                         className="form-control auth-input"
                         placeholder="Type here"
                         value={problemName}
-                        onChange={(e) => handleInputChangeWithValidation(e, setProblemName, setFormErrors, 'problemName')}
+                        onChange={(e) => setProblemName(e.target.value)}
                       />
                     </div>
                   </div>
@@ -984,7 +985,7 @@ function ProjectPage() {
                         className="form-control auth-input"
                         placeholder="Type here"
                         value={solutionName}
-                        onChange={(e) => handleInputChangeWithValidation(e, setSolutionName, setFormErrors, 'solutionName')}
+                        onChange={(e) => setSolutionName(e.target.value)}
                       />
                     </div>
                   </div>
@@ -998,7 +999,7 @@ function ProjectPage() {
                         className="form-control auth-input"
                         placeholder="Type here"
                         value={solutionFunctionName}
-                        onChange={(e) => handleInputChangeWithValidation(e, setSolutionFunctionName, setFormErrors, 'solutionFunctionName')}
+                        onChange={(e) => setSolutionFunctionName(e.target.value)}
                       />
                     </div>
                   </div>

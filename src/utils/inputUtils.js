@@ -1,19 +1,17 @@
 // Input field utilities
 export const capitalizeFirstLetter = (str) => {
-  if (!str) return str;
+  if (!str || str.length === 0) return str;
   return str.charAt(0).toUpperCase() + str.slice(1);
 };
 
 export const handleInputChange = (e, setValue) => {
   const { value } = e.target;
-  const capitalizedValue = capitalizeFirstLetter(value);
-  setValue(capitalizedValue);
+  setValue(value); // Always allow normal typing
 };
 
 export const handleInputChangeWithValidation = (e, setValue, setErrors, fieldName) => {
   const { value } = e.target;
-  const capitalizedValue = capitalizeFirstLetter(value);
-  setValue(capitalizedValue);
+  setValue(value); // Always allow normal typing
   
   // Clear error when user starts typing
   if (setErrors && fieldName) {

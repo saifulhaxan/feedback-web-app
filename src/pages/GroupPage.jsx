@@ -153,7 +153,17 @@ const navigate = useNavigate();
         toast.success(res?.data?.data?.message || "Join request sent");
         fetchGroups(activeTab === "My Groups" ? "normal" : "monitoring")
         fetchPendingGroups()
-        // Optionally refresh groups or update UI
+        
+        // Refresh search results to remove the joined group from dropdown
+        if (searchQuery.trim().length > 0) {
+          searchPublicGroups(searchQuery)
+            .then((searchRes) => {
+              setSearchResults(searchRes?.data?.data?.groups || []);
+            })
+            .catch((err) => {
+              console.error("Failed to refresh search results", err);
+            });
+        }
       })
       .catch((err) => {
         toast.error(err?.response?.data?.message || "Failed to join group");
@@ -362,13 +372,34 @@ const navigate = useNavigate();
                           className="d-flex justify-content-between align-items-center py-2 border-bottom"
                         >
                           <div className="d-flex align-items-center">
-                            <img
-                              src={group.image || "/default-group.png"}
-                              alt="Group"
-                              className="rounded-circle me-2"
-                              width="32"
-                              height="32"
-                            />
+                            <div className="me-2">
+                              {group.imageUrl && !group.imageError ? (
+                                <img
+                                  src={`https://feedbackwork.net/feedbackapi/${group.imageUrl}`}
+                                  alt="Group"
+                                  className="rounded-circle"
+                                  width="32"
+                                  height="32"
+                                  style={{ objectFit: "cover" }}
+                                  onError={() => {
+                                    // Mark this group's image as failed
+                                    group.imageError = true;
+                                    setSearchResults([...searchResults]);
+                                  }}
+                                />
+                              ) : (
+                                <div 
+                                  className="rounded-circle d-flex align-items-center justify-content-center text-white fw-bold"
+                                  style={{ 
+                                    width: 32, 
+                                    height: 32, 
+                                    backgroundColor: '#007bff'
+                                  }}
+                                >
+                                  {getGroupInitials(group.name)}
+                                </div>
+                              )}
+                            </div>
                             <div>
                               <div className="fw-semibold">{group.name}</div>
                               <div className="text-muted small">{group.description}</div>
@@ -434,15 +465,16 @@ const navigate = useNavigate();
                       <div className={`group-card ${gridView ? "text-center" : "d-flex align-items-center justify-content-between px-4"}`}>
                         <div className={`image-wrapper ${gridView ? "text-center" : "d-flex align-items-center"}`}>
                           <div className={`image-wrap ${gridView ? "mb-2" : "me-3"}`}>
-                            {card?.group?.imageUrl ? (
+                            {card?.group?.imageUrl && !card?.group?.imageError ? (
                               <img 
                                 src={`https://feedbackwork.net/feedbackapi/${card.group.imageUrl}`} 
                                 alt="" 
                                 className="rounded-circle"
                                 style={{ width: 60, height: 60, objectFit: "cover", margin: "0 auto" }}
-                                onError={(e) => {
-                                  e.target.style.display = 'none';
-                                  e.target.nextSibling.style.display = 'flex';
+                                onError={() => {
+                                  // Mark this card's image as failed
+                                  card.group.imageError = true;
+                                  setPendingGroup([...pendingGroup]);
                                 }}
                               />
                             ) : (
@@ -485,16 +517,17 @@ const navigate = useNavigate();
                     <div className={`group-card ${gridView ? "text-center" : "d-flex align-items-center justify-content-between px-4"}`}>
                       <div className={`image-wrapper ${gridView ? "text-center" : "d-flex align-items-center"}`}>
                         <div className={`image-wrap ${gridView ? "mb-2" : "me-3"}`}>
-                          {card?.imageUrl ? (
+                          {card?.imageUrl && !card?.imageError ? (
                             <img 
                               src={`https://feedbackwork.net/feedbackapi/${card.imageUrl}`} 
                               alt="" 
                               className="rounded-circle"
                               style={{ width: 60, height: 60, objectFit: "cover", margin: "0 auto", cursor: "pointer" }}
                               onClick={() => navigate(`/groups/${card.id}`)}
-                              onError={(e) => {
-                                e.target.style.display = 'none';
-                                e.target.nextSibling.style.display = 'flex';
+                              onError={() => {
+                                // Mark this card's image as failed
+                                card.imageError = true;
+                                setGroupData({...allGroupsArr});
                               }}
                             />
                           ) : (
@@ -549,15 +582,16 @@ const navigate = useNavigate();
                 <div className={`group-card ${gridView ? "text-center" : "d-flex align-items-center justify-content-between px-4"}`}>
                   <div className={`image-wrapper ${gridView ? "text-center" : "d-flex align-items-center"}`}>
                     <div className={`image-wrap ${gridView ? "mb-2" : "me-3"}`}>
-                      {card?.imageUrl ? (
+                      {card?.imageUrl && !card?.imageError ? (
                         <img 
                           src={`https://feedbackwork.net/feedbackapi/${card.imageUrl}`} 
                           alt="" 
                           className="rounded-circle"
                           style={{ width: 60, height: 60, objectFit: "cover", margin: "0 auto" }}
-                          onError={(e) => {
-                            e.target.style.display = 'none';
-                            e.target.nextSibling.style.display = 'flex';
+                          onError={() => {
+                            // Mark this card's image as failed
+                            card.imageError = true;
+                            setGroupData({...allGroupsArr});
                           }}
                         />
                       ) : (

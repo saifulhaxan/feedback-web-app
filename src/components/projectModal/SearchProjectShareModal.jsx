@@ -104,19 +104,28 @@ const SearchProjectShareModal = ({ open, onClose, projectId, onApiResponse }) =>
                     <div className="d-flex align-items-center">
                       {item.user.image ? (
                         <img
-                          src={item.user.image}
+                          src={item.user.image?.startsWith("http") ? item.user.image : `https://feedbackwork.net/feedbackapi/${item.user.image}`}
                           alt={`${item.user.firstname} ${item.user.lastname}`}
                           className="rounded-circle"
                           style={{ width: "40px", height: "40px", objectFit: "cover" }}
+                          onError={(e) => {
+                            // If image fails to load, hide it and show initials
+                            e.target.style.display = 'none';
+                            e.target.nextElementSibling.style.display = 'flex';
+                          }}
                         />
-                      ) : (
-                        <div
-                          className="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center"
-                          style={{ width: "40px", height: "40px", fontWeight: "bold" }}
-                        >
-                          {initials}
-                        </div>
-                      )}
+                      ) : null}
+                      <div
+                        className="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center"
+                        style={{ 
+                          width: "40px", 
+                          height: "40px", 
+                          fontWeight: "bold",
+                          display: item.user.image ? 'none' : 'flex'
+                        }}
+                      >
+                        {initials}
+                      </div>
                       <div className="ms-3">
                         <div className="fw-semibold">
                           {item.user.firstname} {item.user.lastname}

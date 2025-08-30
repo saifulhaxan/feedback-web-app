@@ -190,6 +190,11 @@ const ProjectCard = ({ projectData, index, onEdit, onDeleted, userData, sharedWi
     return projectData?.isCompleted || projectData?.project?.isCompleted;
   };
 
+  // Helper function to check if project has been started (can show progress)
+  const canShowProgress = () => {
+    return isProjectStarted() || isProjectCompleted() || isProjectExpired();
+  };
+
   // Helper function to determine if project is shared by current user or shared with current user
   const isSharedByMe = () => {
     // If sharedBy exists, it means someone else shared it with me
@@ -468,8 +473,8 @@ const ProjectCard = ({ projectData, index, onEdit, onDeleted, userData, sharedWi
                 </div>
               )}
 
-              {/* Conditional Check Progress Button - Only show if project is started */}
-              {!hideActions && isProjectStarted() && !isProjectExpired() && !isProjectCompleted() && (
+              {/* Conditional Check Progress Button - Show if project has been started (Started, Completed, Paused, or Expired) */}
+              {!hideActions && canShowProgress() && (
                 <div className="px-2 py-2">
                   <Button
                     variant="outline-primary"

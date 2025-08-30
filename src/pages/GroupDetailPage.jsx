@@ -15,7 +15,7 @@ import {
   leaveGroup 
 } from "../api/groupsApi";
 import NormalGroupModal from "../components/groupModal/NormalGroupModal";
-import { searchUsers } from "../api/networkApi";
+import { getAllConnections } from "../api/networkApi";
 import useUserStore from "../store/userStore";
 
 const style = {
@@ -84,8 +84,15 @@ export default function GroupDetailPage() {
   const addMemberMutation = useMutation(addMemberToGroup, {
     onSuccess: (data) => {
       toast.success(data?.data?.data?.message || "Member added successfully!");
+      
+      // Clear all modal state
       setOpenAddMember(false);
       setSelectedUsers([]);
+      setSearchQuery("");
+      setAvailableUsers([]);
+      setSearchLoading(false);
+      
+      // Refresh group data
       getGroupMutation.mutate(groupId);
     },
     onError: (error) => {
@@ -97,6 +104,17 @@ export default function GroupDetailPage() {
     onSuccess: (data) => {
       toast.success(data?.data?.data?.message || "Member removed successfully!");
       getGroupMutation.mutate(groupId);
+      
+      // Refresh available connections list if Add Member modal is open and there's an active search
+      if (openAddMember && searchQuery.trim() !== "") {
+        getAllConnections(null, searchQuery, 0, 20, groupId)
+          .then((res) => {
+            setAvailableUsers(res?.data?.data?.connections || []);
+          })
+          .catch((err) => {
+            console.error("Connection search error:", err);
+          });
+      }
     },
     onError: (error) => {
       toast.error(error?.response?.data?.message || "Failed to remove member");
@@ -131,7 +149,7 @@ export default function GroupDetailPage() {
     }
   }, [groupId]);
 
-  // Debounced user search
+  // Debounced connection search
   useEffect(() => {
     if (searchQuery.trim() === "") {
       setAvailableUsers([]);
@@ -142,14 +160,15 @@ export default function GroupDetailPage() {
 
     const timeout = setTimeout(() => {
       setSearchLoading(true);
-      searchUsers(searchQuery)
+      // Use connections API with excludeGroupId to filter out existing members
+      getAllConnections(null, searchQuery, 0, 20, groupId)
         .then((res) => {
-          console.log(res, "Search Results");
-          setAvailableUsers(res?.data?.data?.users || []);
+          console.log(res, "Connection Search Results");
+          setAvailableUsers(res?.data?.data?.connections || []);
         })
         .catch((err) => {
-          console.error("Search error:", err);
-          toast.error(err?.response?.data?.message || "Failed to search users");
+          console.error("Connection search error:", err);
+          toast.error(err?.response?.data?.message || "Failed to search connections");
         })
         .finally(() => {
           setSearchLoading(false);
@@ -157,7 +176,7 @@ export default function GroupDetailPage() {
     }, 500);
 
     setDebounceTimeout(timeout);
-  }, [searchQuery]);
+  }, [searchQuery, groupId]);
 
   const handleAddMember = () => {
     if (selectedUsers.length === 0) {
@@ -202,6 +221,13 @@ export default function GroupDetailPage() {
     setSearchQuery("");
     setSelectedUsers([]);
     setAvailableUsers([]);
+    setSearchLoading(false);
+    
+    // Clear any pending debounce timeout
+    if (debounceTimeout) {
+      clearTimeout(debounceTimeout);
+      setDebounceTimeout(null);
+    }
   };
 
   const isGroupOwner = groupData?.createdById === userData?.user?.id;
@@ -411,13 +437,13 @@ export default function GroupDetailPage() {
           <h3 className="mb-4">Add Member</h3>
           
           <div className="form-group mb-3">
-            <label className="auth-label">Search Users</label>
+            <label className="auth-label">Search Your Connections</label>
             <div className="authInputWrap d-flex align-items-center ps-3">
               <IoIosSearch className="connection-search-icon" />
               <input
                 type="text"
                 className="form-control auth-input"
-                placeholder="Search users..."
+                placeholder="Search your connections..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
@@ -425,38 +451,42 @@ export default function GroupDetailPage() {
           </div>
 
           <div className="mb-3">
-            <h6>Available Users</h6>
+            <h6>Available Connections</h6>
             <div className="max-h-60 overflow-auto">
               {searchLoading ? (
                 <div className="text-center py-3">
                   <CircularProgress size={24} />
-                  <p className="mt-2">Searching users...</p>
+                  <p className="mt-2">Searching connections...</p>
                 </div>
               ) : searchQuery.trim() === "" ? (
-                <p className="text-muted text-center py-3">Type to search for users</p>
+                <p className="text-muted text-center py-3">Type to search for your connections</p>
               ) : availableUsers.length === 0 ? (
-                <p className="text-muted text-center py-3">No users found</p>
+                <p className="text-muted text-center py-3">No connections found</p>
               ) : (
-                availableUsers.map((user) => (
-                  <div key={user.id} className="d-flex align-items-center p-2 border-bottom">
-                    <input
-                      type="checkbox"
-                      checked={selectedUsers.includes(user.id)}
-                      onChange={(e) => {
-                        if (e.target.checked) {
-                          setSelectedUsers([...selectedUsers, user.id]);
-                        } else {
-                          setSelectedUsers(selectedUsers.filter(id => id !== user.id));
-                        }
-                      }}
-                      className="me-2"
-                    />
-                    <Avatar sx={{ width: 32, height: 32, marginRight: "8px" }}>
-                      {getInitials(user.firstname, user.lastname)}
-                    </Avatar>
-                    <span>{user.firstname} {user.lastname}</span>
-                  </div>
-                ))
+                availableUsers.map((connection) => {
+                  // Handle connection structure - user data is nested under connection.user
+                  const user = connection.user || connection;
+                  return (
+                    <div key={user.id} className="d-flex align-items-center p-2 border-bottom">
+                      <input
+                        type="checkbox"
+                        checked={selectedUsers.includes(user.id)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedUsers([...selectedUsers, user.id]);
+                          } else {
+                            setSelectedUsers(selectedUsers.filter(id => id !== user.id));
+                          }
+                        }}
+                        className="me-2"
+                      />
+                      <Avatar sx={{ width: 32, height: 32, marginRight: "8px" }}>
+                        {getInitials(user.firstname, user.lastname)}
+                      </Avatar>
+                      <span>{user.firstname} {user.lastname}</span>
+                    </div>
+                  );
+                })
               )}
             </div>
           </div>

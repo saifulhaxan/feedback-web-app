@@ -105,6 +105,50 @@ export default function NormalGroupModal({ open, onClose, onGroupCreated, editMo
   };
 
   const handleSteps = async () => {
+    // If in edit mode, directly submit the form (skip member selection)
+    if (editMode) {
+      if (!groupName.trim()) {
+        toast.error("Please enter a group name.");
+        return;
+      }
+
+      try {
+        setLoading(true);
+
+        let data;
+        
+        // Always use FormData for PATCH requests to handle optional image
+        const formData = new FormData();
+        formData.append("name", groupName);
+        formData.append("description", groupDescription);
+        formData.append("isPrivate", isPrivate);
+        
+        // Only append image if it's available/selected
+        if (imageData) {
+          formData.append("image", imageData);
+        }
+
+        // Update existing group
+        data = await Fetcher.patch(`/user/network/groups/${groupData.id}`, formData, {
+          headers: {
+            "Content-Type": "multipart/form-data",
+          },
+        });
+        toast.success(data?.data?.data?.message || "Group updated successfully!");
+
+        if (onGroupCreated) {
+          onGroupCreated();
+        }
+        handleModalClose();
+      } catch (error) {
+        toast.error(error?.response?.data?.message || "Failed to update group.");
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
+
+    // For create mode, handle the step flow
     if (!nextStep) {
       if (!userFilters || userFilters.length === 0) {
         toast.error("Please select at least one member for the group.");
@@ -128,31 +172,20 @@ export default function NormalGroupModal({ open, onClose, onGroupCreated, editMo
 
         formData.append("memberIds", JSON.stringify(userFilters));
 
-        let data;
-        if (editMode && groupData) {
-          // Update existing group
-          data = await Fetcher.patch(`/user/network/groups/${groupData.id}`, formData, {
-            headers: {
-              "Content-Type": "multipart/form-data",
-            },
-          });
-          toast.success(data?.data?.data?.message || "Group updated successfully!");
-        } else {
-          // Create new group
-          data = await Fetcher.post("/user/network/groups", formData, {
-            headers: {
-              "Content-Type": "multipart/form-data",
-            },
-          });
-          toast.success(data?.data?.data?.message || "Group created successfully!");
-        }
+        // Create new group
+        const data = await Fetcher.post("/user/network/groups", formData, {
+          headers: {
+            "Content-Type": "multipart/form-data",
+          },
+        });
+        toast.success(data?.data?.data?.message || "Group created successfully!");
 
         if (onGroupCreated) {
           onGroupCreated();
         }
         handleModalClose();
       } catch (error) {
-        toast.error(error?.response?.data?.message || `Failed to ${editMode ? 'update' : 'create'} group.`);
+        toast.error(error?.response?.data?.message || "Failed to create group.");
       } finally {
         setLoading(false);
       }
@@ -302,9 +335,7 @@ export default function NormalGroupModal({ open, onClose, onGroupCreated, editMo
         <div className="d-flex justify-content-between status-btn-bar mt-5 mb-5">
           <Button onClick={handleCancelBtn}>{nextStep === false ? "Back" : "Cancel"}</Button>
           <Button onClick={handleSteps} disabled={loading}>
-            {loading ? "Processing..." : nextStep === false ? 
-              (editMode ? "Update Group" : "Submit") : 
-              "Next"}
+            {loading ? "Processing..." : editMode ? "Update Group" : nextStep === false ? "Submit" : "Next"}
           </Button>
         </div>
       </Box>
