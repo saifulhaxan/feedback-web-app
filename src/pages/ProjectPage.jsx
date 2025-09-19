@@ -102,7 +102,6 @@ function ProjectPage() {
   const [youtubeLink, setYoutubeLink] = useState("");
   const [modalTab, setModalTab] = useState(1);
   const [projectData, setProjectData] = useState();
-  const [numberOfSteps, setNumberOfSteps] = useState(""); // New field for number of steps
   const [formErrors, setFormErrors] = useState({}); // Form validation errors
 
   // Step 2 states
@@ -112,8 +111,9 @@ function ProjectPage() {
   const [beepAudio, setBeepAudio] = useState(null);
   const [beepAtBreak, setBeepAtBreak] = useState(false);
   const [popupText, setPopupText] = useState("");
-  const [stepsPerHour, setStepsPerHour] = useState(""); // empty string, not 1
   const [estimatedHours, setEstimatedHours] = useState(""); // New state for estimated hours
+  const [numberOfSteps, setNumberOfSteps] = useState(""); // Number of steps for step config modal
+  const [automaticStep, setAutomaticStep] = useState(false); // Automatic step checkbox
   const [firstStepData, setFirstStepData] = useState("");
   const [status, setStatus] = useState("");
 
@@ -248,7 +248,93 @@ function ProjectPage() {
     }
   };
 
-  // Calculate estimated completion hours
+  // Helper function to calculate hours between two datetimes
+  const calculateHoursBetween = (startDateTime, endDateTime) => {
+    if (!startDateTime || !endDateTime) {
+      return 0;
+    }
+    
+    const startDate = new Date(startDateTime);
+    const endDate = new Date(endDateTime);
+    
+    // Calculate total hours between start and end
+    const totalHours = (endDate - startDate) / (1000 * 60 * 60); // Convert milliseconds to hours
+    
+    return totalHours > 0 ? totalHours : 0;
+  };
+
+  // Helper function to enforce integer & non-zero steps rule
+  const enforceIntegerSteps = (value) => {
+    if (value <= 0) {
+      return 1;
+    }
+    if (value < 1) {
+      return 1;
+    }
+    return Math.floor(value);
+  };
+
+  // Calculate estimated completion hours based on automatic step mode (matching mobile app logic)
+  const calculateEstimatedCompletionHours = (startDateTime, endDateTime, numberOfSteps, isAutomaticStep) => {
+    if (!startDateTime || !endDateTime) {
+      return "";
+    }
+    
+    const totalHours = calculateHoursBetween(startDateTime, endDateTime);
+    
+    if (totalHours <= 0) {
+      return "";
+    }
+    
+    if (isAutomaticStep) {
+      // When automatic step is enabled: estimatedCompletionHours = totalDurationHours
+      return totalHours.toFixed(1);
+    } else {
+      // When automatic step is disabled: estimatedCompletionHours = 100 / selectedStep
+      if (!numberOfSteps || numberOfSteps <= 0) {
+        return "";
+      }
+      const estimation = 100 / numberOfSteps;
+      return estimation.toFixed(1);
+    }
+  };
+
+  // Calculate numberOfSteps for automatic mode (matching mobile app logic)
+  const calculateAutomaticSteps = (startDateTime, endDateTime) => {
+    const totalHours = calculateHoursBetween(startDateTime, endDateTime);
+    
+    if (totalHours <= 0) {
+      return 1;
+    }
+    
+    // selectedStep = (100 / totalDurationHours).ceil().toInt()
+    const calculatedSteps = Math.ceil(100 / totalHours);
+    return enforceIntegerSteps(calculatedSteps);
+  };
+
+  // Legacy function for backward compatibility
+  const calculateEstimatedCompletionTime = (startDateTime, endDateTime, numberOfSteps) => {
+    if (!startDateTime || !endDateTime || !numberOfSteps || numberOfSteps <= 0) {
+      return "";
+    }
+    
+    const startDate = new Date(startDateTime);
+    const endDate = new Date(endDateTime);
+    
+    // Calculate total hours between start and end
+    const totalHours = (endDate - startDate) / (1000 * 60 * 60); // Convert milliseconds to hours
+    
+    if (totalHours <= 0) {
+      return "";
+    }
+    
+    // Calculate estimated completion time per step
+    const estimatedTimePerStep = totalHours / numberOfSteps;
+    
+    return estimatedTimePerStep.toFixed(2);
+  };
+
+  // Legacy function for backward compatibility
   const calculateEstimatedHours = (totalSteps, stepsPerHour) => {
     if (totalSteps && stepsPerHour && stepsPerHour > 0) {
       const hours = totalSteps / stepsPerHour;
@@ -279,7 +365,6 @@ function ProjectPage() {
     setYoutubeLink("");
     setUploadedFile(null);
     setEditorState(EditorState.createEmpty());
-    setNumberOfSteps(""); // Reset new field
 
     setStartDate("");
     setFinishDate("");
@@ -287,6 +372,8 @@ function ProjectPage() {
     setBeepAudio(null);
     setPopupText("");
     setEstimatedHours(""); // Reset estimated hours
+    setNumberOfSteps(""); // Reset number of steps
+    setAutomaticStep(false); // Reset automatic step
     setUseJsonFormat(false); // Reset format toggle
     setUseStepConfigJsonFormat(false); // Reset stepConfig format toggle
   };
@@ -373,10 +460,6 @@ function ProjectPage() {
       toast.error("Solution Name is required!");
       return; // ❗️ Stop here - Do NOT continue to API
     }
-    if (!numberOfSteps || numberOfSteps <= 0) {
-      toast.error("Number of Steps is required and must be greater than 0!");
-      return; // ❗️ Stop here - Do NOT continue to API
-    }
 
     // Check if we have a file upload or want to use JSON format
     if (uploadedFile || !useJsonFormat) {
@@ -392,7 +475,6 @@ function ProjectPage() {
     if (uploadedFile) {
       formData.append("imageUrl", uploadedFile);
     }
-    formData.append("numberOfSteps", numberOfSteps); // Append new field
 
     if (editMode) {
       // UPDATE PROJECT (STEP 1)
@@ -413,8 +495,7 @@ function ProjectPage() {
         solutionFunction: solutionFunctionName,
         description: draftToHtml(convertToRaw(editorState.getCurrentContent())),
         youtubeLink: youtubeLink,
-        status: "In Progress",
-        numberOfSteps: numberOfSteps // Include new field in JSON
+        status: "In Progress"
         // Note: userId is not included in JSON format as per your specification
       };
 
@@ -428,7 +509,6 @@ function ProjectPage() {
         formData.append("youtubeLink", youtubeLink);
         formData.append("userId", userId);
         formData.append("description", draftToHtml(convertToRaw(editorState.getCurrentContent())));
-        formData.append("numberOfSteps", numberOfSteps); // Append new field
 
         editProjectBasicMutation.mutate({
           id: editingProjectId,
@@ -468,7 +548,13 @@ function ProjectPage() {
     e.preventDefault();
 
     // Validation for step config
-    if (!stepsPerHour || stepsPerHour <= 0) {
+    if (!numberOfSteps || numberOfSteps <= 0) {
+      toast.error("Number of Steps is required and must be greater than 0!");
+      return;
+    }
+    
+    // Additional validation for stepsPerHour (API requirement)
+    if (!numberOfSteps || numberOfSteps <= 0) {
       toast.error("Steps per Hour is required and must be greater than 0!");
       return;
     }
@@ -485,7 +571,9 @@ function ProjectPage() {
         projectId: projectId,
         startTime: toISOString(startDate),
         endTime: toISOString(finishDate),
-        stepsPerHour: Number(stepsPerHour), // Convert to number
+        numberOfSteps: Number(numberOfSteps), // Convert to number
+        stepsPerHour: numberOfSteps ? Number(numberOfSteps) : 1, // Add stepsPerHour field (using numberOfSteps value, default to 1)
+        automaticStep: automaticStep, // Include automatic step flag
         breakTime: toISOString(breakDate),
         beepAudio: "https://example.com/beep.mp3", // Default URL for JSON format
         popupText: popupText
@@ -501,8 +589,10 @@ function ProjectPage() {
     formData.append("startTime", toISOString(startDate));
     formData.append("endTime", toISOString(finishDate));
     formData.append("breakTime", toISOString(breakDate));
-    formData.append("beepAtBreakTime", beepAtBreak);
-        formData.append("stepsPerHour", String(stepsPerHour)); // Convert to string as API expects
+        formData.append("beepAtBreakTime", beepAtBreak);
+        formData.append("numberOfSteps", String(numberOfSteps)); // Convert to string as API expects
+        formData.append("stepsPerHour", String(numberOfSteps)); // Add stepsPerHour field (using numberOfSteps value)
+        formData.append("automaticStep", String(automaticStep)); // Convert to string as API expects
         formData.append("popupText", popupText);
 
         if (beepAudio) {
@@ -528,7 +618,9 @@ function ProjectPage() {
         formData.append("endTime", toISOString(finishDate));
         formData.append("breakTime", toISOString(breakDate));
         formData.append("beepAtBreakTime", beepAtBreak);
-        formData.append("stepsPerHour", String(stepsPerHour)); // Convert to string as API expects
+        formData.append("numberOfSteps", String(numberOfSteps)); // Convert to string as API expects
+        formData.append("stepsPerHour", String(numberOfSteps)); // Add stepsPerHour field (using numberOfSteps value)
+        formData.append("automaticStep", String(automaticStep)); // Convert to string as API expects
         formData.append("popupText", popupText);
         formData.append("beepAudio", beepAudio);
         
@@ -562,7 +654,9 @@ function ProjectPage() {
           projectId: projectId,
           startTime: toISOString(startDate),
           endTime: toISOString(finishDate),
-          stepsPerHour: String(stepsPerHour), // Convert to string as API expects
+          numberOfSteps: String(numberOfSteps), // Convert to string as API expects
+          stepsPerHour: String(numberOfSteps), // Add stepsPerHour field (using numberOfSteps value)
+          automaticStep: String(automaticStep), // Convert to string as API expects
           breakTime: toISOString(breakDate),
           beepAtBreakTime: beepAtBreak,
           beepAudio: "https://example.com/beep.mp3", // Default URL for JSON format
@@ -571,7 +665,7 @@ function ProjectPage() {
         
         console.log('Step config JSON data (no file):', stepConfigData);
         console.log('ProjectId type:', typeof projectId, 'Value:', projectId);
-        console.log('StepsPerHour type:', typeof stepConfigData.stepsPerHour, 'Value:', stepConfigData.stepsPerHour);
+        console.log('NumberOfSteps type:', typeof stepConfigData.numberOfSteps, 'Value:', stepConfigData.numberOfSteps);
         console.log('Raw projectId from firstStepData:', firstStepData?.id, 'Type:', typeof firstStepData?.id);
         console.log('Raw editingProjectId:', editingProjectId, 'Type:', typeof editingProjectId);
 
@@ -612,7 +706,6 @@ function ProjectPage() {
     setSolutionFunctionName(projectData.solutionFunction || "");
     setYoutubeLink(projectData.youtubeLink || "");
     setStatus(projectData.status || "");
-    setNumberOfSteps(projectData.numberOfSteps || ""); // Prefill new field
 
     const contentState = ContentState.createFromBlockArray(convertFromHTML(projectData.description || ""));
     setEditorState(EditorState.createWithContent(contentState));
@@ -642,15 +735,13 @@ function ProjectPage() {
       setBreakDate(config.breakTime ? new Date(config.breakTime).toISOString().slice(0, 16) : "");
       setBeepAtBreak(config.beepAtBreakTime || false);
       setPopupText(config.popupText || "");
-      setStepsPerHour(config.stepsPerHour || "");
+      setNumberOfSteps(config.numberOfSteps || "");
+      setAutomaticStep(config.automaticStep || false);
 
       // Calculate estimated hours for existing project
-      if (config.stepsPerHour && numberOfSteps) {
-        const estimated = calculateEstimatedHours(numberOfSteps, config.stepsPerHour);
-        setEstimatedHours(estimated);
-      } else if (config.stepsPerHour && projectData.numberOfSteps) {
-        // Use project's numberOfSteps if available
-        const estimated = calculateEstimatedHours(projectData.numberOfSteps, config.stepsPerHour);
+      if (config.startTime && config.endTime && config.numberOfSteps) {
+        const isAuto = config.automaticStep || false;
+        const estimated = calculateEstimatedCompletionHours(config.startTime, config.endTime, config.numberOfSteps, isAuto);
         setEstimatedHours(estimated);
       }
 
@@ -671,7 +762,6 @@ function ProjectPage() {
       setBreakDate("");
       setBeepAtBreak(false);
       setPopupText("");
-      setStepsPerHour("");
       setEstimatedHours("");
       setBeepAudio(null);
     }
@@ -730,6 +820,26 @@ function ProjectPage() {
       return;
     }
     setFinishDate(value);
+    
+    // If finish date is cleared, disable automatic step
+    if (!value && automaticStep) {
+      setAutomaticStep(false);
+      setNumberOfSteps("");
+      setEstimatedHours("");
+    }
+    
+    // Recalculate based on automatic step mode
+    if (automaticStep && startDate && value) {
+      // When automatic step is enabled, recalculate numberOfSteps and estimated hours
+      const autoSteps = calculateAutomaticSteps(startDate, value);
+      setNumberOfSteps(autoSteps);
+      const estimated = calculateEstimatedCompletionHours(startDate, value, autoSteps, true);
+      setEstimatedHours(estimated);
+    } else if (numberOfSteps && startDate && value) {
+      // When manual mode, recalculate estimated hours
+      const estimated = calculateEstimatedCompletionHours(startDate, value, numberOfSteps, false);
+      setEstimatedHours(estimated);
+    }
   };
 
   // Handler for break date change
@@ -1031,39 +1141,6 @@ function ProjectPage() {
                   />
                 </div>
 
-                {/* Number of Steps */}
-                <div className="form-group mb-3 w-100">
-                  <label className="auth-label">Number of Steps</label>
-                  <div className="authInputWrap d-flex align-items-center ps-3">
-                    <input
-                      type="number"
-                      className="form-control auth-input"
-                      min={1}
-                      max={1000}
-                      placeholder="Enter total number of steps"
-                      value={numberOfSteps}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        // Allow empty string for clearing
-                        if (val === "") {
-                          setNumberOfSteps("");
-                          setEstimatedHours("");
-                          return;
-                        }
-                        // Only allow numbers between 1 and 1000
-                        const num = Number(val);
-                        if (num >= 1 && num <= 1000) {
-                          setNumberOfSteps(num);
-                          // Calculate estimated hours if steps per hour is also set
-                          if (stepsPerHour) {
-                            const estimated = calculateEstimatedHours(num, stepsPerHour);
-                            setEstimatedHours(estimated);
-                          }
-                        }
-                      }}
-                    />
-                  </div>
-                </div>
 
                 {/* Upload Image */}
                 <div className="form-group mb-3 w-100">
@@ -1167,7 +1244,30 @@ function ProjectPage() {
                         className="form-control auth-input"
                         value={startDate}
                         min={minDateTime}
-                        onChange={(e) => setStartDate(e.target.value)}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          setStartDate(value);
+                          
+                          // If start date is cleared, disable automatic step
+                          if (!value && automaticStep) {
+                            setAutomaticStep(false);
+                            setNumberOfSteps("");
+                            setEstimatedHours("");
+                          }
+                          
+                          // Recalculate based on automatic step mode
+                          if (automaticStep && value && finishDate) {
+                            // When automatic step is enabled, recalculate numberOfSteps and estimated hours
+                            const autoSteps = calculateAutomaticSteps(value, finishDate);
+                            setNumberOfSteps(autoSteps);
+                            const estimated = calculateEstimatedCompletionHours(value, finishDate, autoSteps, true);
+                            setEstimatedHours(estimated);
+                          } else if (numberOfSteps && finishDate && value) {
+                            // When manual mode, recalculate estimated hours
+                            const estimated = calculateEstimatedCompletionHours(value, finishDate, numberOfSteps, false);
+                            setEstimatedHours(estimated);
+                          }
+                        }}
                       />
                     </div>
                   </div>
@@ -1208,38 +1308,77 @@ function ProjectPage() {
                   </div>
                 </div>
 
+                {/* Automatic Step */}
+                <div className="form-group mb-3 w-100 d-flex align-items-center">
+                  <input 
+                    type="checkbox" 
+                    className="form-check-input me-2" 
+                    checked={automaticStep} 
+                    disabled={!startDate || !finishDate}
+                    onChange={(e) => {
+                      const isChecked = e.target.checked;
+                      setAutomaticStep(isChecked);
+                      
+                      if (isChecked) {
+                        // When automatic step is enabled, calculate numberOfSteps automatically
+                        if (startDate && finishDate) {
+                          const autoSteps = calculateAutomaticSteps(startDate, finishDate);
+                          setNumberOfSteps(autoSteps);
+                          const estimated = calculateEstimatedCompletionHours(startDate, finishDate, autoSteps, true);
+                          setEstimatedHours(estimated);
+                        }
+                      } else {
+                        // When automatic step is disabled, clear numberOfSteps and recalculate
+                        setNumberOfSteps("");
+                        setEstimatedHours("");
+                      }
+                    }} 
+                  />
+                  <label className="auth-label mb-0">
+                    Automatic step
+                    {(!startDate || !finishDate) && (
+                      <small className="text-muted ms-2">(Set start and end dates first)</small>
+                    )}
+                  </label>
+                </div>
+
                 {/* Beep At Break Time */}
                 <div className="form-group mb-3 w-100 d-flex align-items-center">
                   <input type="checkbox" className="form-check-input me-2" checked={beepAtBreak} onChange={() => setBeepAtBreak(!beepAtBreak)} />
                   <label className="auth-label mb-0">Beep at Break Time</label>
                 </div>
 
-                {/* Steps per Hour */}
+                {/* Number of Steps */}
                 <div className="form-group mb-3 w-100">
-                  <label className="auth-label">Steps per Hour</label>
+                  <label className="auth-label">Number of Steps</label>
                   <div className="authInputWrap d-flex align-items-center ps-3">
                     <input
                       type="number"
                       className="form-control auth-input"
                       min={1}
-                      max={50}
-                      placeholder="Enter steps per hour"
-                      value={stepsPerHour}
+                      max={1000}
+                      placeholder={automaticStep ? "Auto-calculated" : "Enter number of steps"}
+                      value={numberOfSteps}
+                      disabled={automaticStep}
                       onChange={(e) => {
+                        if (automaticStep) return; // Don't allow changes when automatic step is enabled
+                        
                         const val = e.target.value;
                         // Allow empty string for clearing
                         if (val === "") {
-                          setStepsPerHour("");
+                          setNumberOfSteps("");
                           setEstimatedHours("");
                           return;
                         }
-                        // Only allow numbers between 1 and 50
+                        // Only allow numbers between 1 and 1000
                         const num = Number(val);
-                        if (num >= 1 && num <= 50) {
-                          setStepsPerHour(num);
-                          // Calculate estimated hours
-                          const estimated = calculateEstimatedHours(numberOfSteps, num);
-                          setEstimatedHours(estimated);
+                        if (num >= 1 && num <= 1000) {
+                          setNumberOfSteps(num);
+                          // Calculate estimated completion hours using manual formula
+                          if (startDate && finishDate) {
+                            const estimated = calculateEstimatedCompletionHours(startDate, finishDate, num, false);
+                            setEstimatedHours(estimated);
+                          }
                         }
                       }}
                     />
@@ -1247,41 +1386,18 @@ function ProjectPage() {
                   {estimatedHours && (
                     <div className="mt-2">
                       <small className="text-muted">
-                        Estimated completion time: <strong>{estimatedHours} hours</strong> 
-                        {numberOfSteps && stepsPerHour && (
-                          <span> ({numberOfSteps} steps ÷ {stepsPerHour} steps/hour)</span>
+                        {automaticStep ? (
+                          <>Estimated completion hours: <span className="text-primary fw-bold">{estimatedHours} hr</span></>
+                        ) : (
+                          <>Estimated completion hours: <span className="text-primary fw-bold">{estimatedHours} hr</span></>
                         )}
                       </small>
                     </div>
                   )}
                 </div>
 
-                {/* DateTime Information Display */}
-                {(startDate || finishDate) && (
-                  <div className="form-group mb-3 w-100">
-                    <label className="auth-label">Project Timeline (Local Time)</label>
-                    <div className="p-3 bg-light rounded">
-                      {startDate && (
-                        <div className="mb-2">
-                          <small className="text-muted">Start Date/Time:</small>
-                          <div className="fw-bold">{formatToLocalDateTime(startDate)}</div>
-                        </div>
-                      )}
-                      {finishDate && (
-                        <div className="mb-2">
-                          <small className="text-muted">End Date/Time:</small>
-                          <div className="fw-bold">{formatToLocalDateTime(finishDate)}</div>
-                        </div>
-                      )}
-                      {breakDate && (
-                        <div>
-                          <small className="text-muted">Break Date/Time:</small>
-                          <div className="fw-bold">{formatToLocalDateTime(breakDate)}</div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
+
+
 
                 {/* Popup Text */}
                 <div className="form-group mb-3 w-100">
