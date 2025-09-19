@@ -310,8 +310,8 @@ export default function ManageRelationPage() {
 
   // Removed hardcoded myParentArr - now using state variable
 
-  const filterCategories = ["0-5", "5-17", "17-23"];
-  const gradeCategory = ["1st Grade", "2nd Grade", "3rd Grade", "4rth Grade", "5th Grade", "6th Grade"];
+  const filterCategories = ["2-5", "5-10", "11-13", "14-18"];
+  const gradeCategory = ["preschool", "K-5 grade", "6-8 grade", "9-12 grade"];
 
   const toggleExpand = () => setIsExpanded((prev) => !prev);
   const handleSwitchTabs = (tabNameOrEvent) => {
